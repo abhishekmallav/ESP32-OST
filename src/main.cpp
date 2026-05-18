@@ -21,8 +21,8 @@ extern "C" int ieee80211_raw_frame_sanity_check(int32_t arg, int32_t arg2,
 WebServer server(80);
 
 // -- Wi-Fi Credentials --
-const char *HOME_SSID = ":)";
-const char *HOME_PASS = "0000000000";
+const char *HOME_SSID = "ESP32-OST";
+const char *HOME_PASS = "Password123";
 
 // -- State Flags --
 bool isProbing = false;
