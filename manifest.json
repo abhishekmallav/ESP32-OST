@@ -1,0 +1,15 @@
+{
+  "name": "ESP32-OST",
+  "version": "2.0",
+  "builds": [
+    {
+      "chipFamily": "ESP32",
+      "parts": [
+        { "path": "dist/bootloader.bin", "offset": 4096 },
+        { "path": "dist/partitions.bin", "offset": 32768 },
+        { "path": "dist/firmware.bin", "offset": 65536 },
+        { "path": "dist/spiffs.bin", "offset": 2686976 }
+      ]
+    }
+  ]
+}
