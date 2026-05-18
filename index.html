@@ -411,9 +411,11 @@
   <section id="install" class="flash-section">
     <h2>Hardware Initialization</h2>
     <p>Flash the firmware directly from Chrome/Edge using Web Serial API.</p>
-    <button class="btn-accent pulse" style="font-size: 1.1rem; padding: 16px 36px;" onclick="openModal()">
-      <i class="fas fa-microchip" style="margin-right: 8px;"></i> Flash Firmware to ESP32
-    </button>
+    <div id="installBtnContainer">
+      <button class="btn-accent pulse" style="font-size: 1.1rem; padding: 16px 36px;" onclick="openModal()">
+        <i class="fas fa-microchip" style="margin-right: 8px;"></i> Flash Firmware to ESP32
+      </button>
+    </div>
   </section>
 
   <!-- Disclaimer -->
@@ -442,8 +444,7 @@
       <p style="font-size: 0.95rem; color: var(--text-muted);">Ensure you have selected the correct COM port when prompted by your browser.</p>
       
       <div class="modal-actions">
-        <!-- The actual Web Tools button -->
-        <esp-web-install-button manifest="manifest.json" class="visible"></esp-web-install-button>
+        <button class="btn-accent" onclick="acceptWarning()">I Understand, Continue</button>
         <button class="btn-outline" onclick="closeModal()">Cancel Operation</button>
       </div>
     </div>
@@ -489,11 +490,41 @@
       if (e.target === modalOverlay) closeModal();
     });
 
-    const installButton = document.querySelector('esp-web-install-button');
-    installButton.addEventListener('install-finished', () => {
+    function acceptWarning() {
       closeModal();
-      alert("Installation Complete! Ensure your ESP32-OST AP is active, wait for reboot, and navigate to the assigned IP address.");
-    });
+      console.log("[ESP32-OST] Data loss warning accepted.");
+      
+      const container = document.getElementById('installBtnContainer');
+      container.innerHTML = `
+        <esp-web-install-button manifest="manifest.json">
+          <button slot="activation" class="btn-accent" style="font-size: 1.1rem; padding: 16px 36px;">
+            <i class="fas fa-usb" style="margin-right: 8px;"></i> Select Port & Flash
+          </button>
+          <span slot="unsupported">Your browser does not support Web Serial. Please use Google Chrome or Microsoft Edge.</span>
+          <span slot="not-allowed">You need to serve this page over HTTPS to use Web Serial.</span>
+        </esp-web-install-button>
+      `;
+
+      // Wait a moment for the custom element to parse, then attach event listeners
+      setTimeout(() => {
+        const espButton = document.querySelector('esp-web-install-button');
+        if (espButton) {
+          console.log("[ESP32-OST] esp-web-install-button injected into DOM. Ready for serial connection.");
+          
+          // The event 'state-changed' might not be standard in all versions, 
+          // but we can listen to standard DOM events if they bubble, or just log clicks.
+          espButton.addEventListener('click', () => {
+            console.log("[ESP32-OST] User clicked the flash button. Awaiting Serial Port selection...");
+          });
+
+          // Wait for custom events if fired
+          espButton.addEventListener('install-finished', () => {
+            console.log("[ESP32-OST] Installation finished successfully.");
+            alert("Installation Complete! Ensure your ESP32-OST AP is active, wait for reboot, and navigate to the assigned IP address.");
+          });
+        }
+      }, 500);
+    }
   </script>
 </body>
 </html>
