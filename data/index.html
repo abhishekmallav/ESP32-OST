@@ -32,7 +32,7 @@ h1 i{color:var(--primary)}
 
 /* Navigation and Global Status */
 .nav-container { display: flex; flex-direction: row; justify-content: space-between; align-items: center; background: var(--surface); padding: 10px; border-radius: var(--radius); border: 1px solid var(--border); margin-bottom: 24px; flex-wrap: wrap; gap: 12px; box-shadow: var(--shadow); }
-.nav-tabs { display: flex; gap: 8px; overflow-x: auto; flex: 1; }
+.nav-tabs { display: flex; gap: 8px; flex-wrap: wrap; flex: 1; }
 .tab-btn{padding:10px 18px;border:none;background:transparent;color:var(--text-muted);font-weight:600;font-size:.9rem;cursor:pointer;border-radius:8px;transition:all 0.3s ease;white-space:nowrap;display:flex;align-items:center;gap:8px}
 .tab-btn:hover{background:var(--surface2);color:var(--text)}
 .tab-btn.active{background:var(--primary);color:#fff;box-shadow: 0 4px 12px rgba(37,99,235,0.25)}
@@ -143,7 +143,8 @@ input:checked+.slider:before{transform:translateX(24px)}
     <button class="tab-btn"        id="tab-spammer"  onclick="switchTab('spammer',this)"><i class="fas fa-broadcast-tower"></i> Spammer</button>
     <button class="tab-btn"        id="tab-phishing" onclick="switchTab('phishing',this)"><i class="fas fa-fish"></i> Captive Portal</button>
   </div>
-  <div class="global-status">
+  <div class="global-status" style="gap:12px;">
+    <span class="pill pill-green" id="connectionMonitor" title="Online"><i class="fas fa-wifi"></i></span>
     <span class="pill pill-outline" id="globalStatusIndicator"><i class="fas fa-circle-notch"></i> System Idle</span>
   </div>
 </div>
@@ -317,9 +318,47 @@ let pollInterval  = null;
 let ghostInterval = null;
 let phishingInterval = null;
 let popupTimer    = null;
+let probeTimer    = null;
 
 let currentDeauthMac = null;
 let lastProbeData = [];
+let isOnline = true;
+
+// ---------------------------------------------------------------------------
+// Connection Monitor
+// ---------------------------------------------------------------------------
+setInterval(async () => {
+  try {
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), 1500);
+    const res = await fetch('/ping', { signal: controller.signal });
+    clearTimeout(id);
+    if (res.ok) {
+      if (!isOnline) {
+        isOnline = true;
+        document.getElementById('connectionMonitor').className = 'pill pill-green';
+        document.getElementById('connectionMonitor').innerHTML = '<i class="fas fa-wifi"></i>';
+        document.getElementById('connectionMonitor').title = 'Online';
+        showPopup('System Online', 'Connection to ESP32 restored.', 'wifi');
+        if (document.getElementById('probeStatusText').innerText.includes('Reconnecting')) {
+           pollProbe();
+           setProbeStatus('Done - Results loaded.', 'var(--success)');
+           setGlobalStatus('System Idle', 'pill-outline', 'circle-notch');
+        }
+      }
+    } else {
+      throw new Error('Not OK');
+    }
+  } catch (e) {
+    if (isOnline) {
+      isOnline = false;
+      document.getElementById('connectionMonitor').className = 'pill pill-red pulse';
+      document.getElementById('connectionMonitor').innerHTML = '<i class="fas fa-exclamation-triangle"></i>';
+      document.getElementById('connectionMonitor').title = 'Offline';
+      showPopup('System Offline', 'Connection to ESP32 lost. Reconnecting...', 'exclamation-triangle');
+    }
+  }
+}, 2000);
 
 // ---------------------------------------------------------------------------
 // Global Status Indicator
@@ -453,18 +492,30 @@ async function stopSpoof() {
 // ---------------------------------------------------------------------------
 async function startProbe() {
   if (!currentTarget) { showPopup('No Target', 'Select a network from the Scanner tab first.', 'exclamation-triangle'); return; }
-  setProbeStatus('Probing…', 'var(--warning)');
   setGlobalStatus('Probing Clients', 'pill-blue', 'satellite-dish');
-  const res = await fetch(`/probe_start?bssid=${currentTarget.bssid}&channel=${currentTarget.channel}`);
-  if (res.ok) {
-    setProbeStatus(`Probing- ${currentTarget.bssid}`, 'var(--success)');
-    clearInterval(pollInterval);
-    pollInterval = setInterval(pollProbe, 2000);
-  }
+  
+  let timeLeft = 10;
+  setProbeStatus(`Offline - Probing for ${timeLeft}s…`, 'var(--warning)');
+  clearInterval(pollInterval);
+  clearInterval(probeTimer);
+  probeTimer = setInterval(() => {
+    timeLeft--;
+    if (timeLeft > 0) {
+      setProbeStatus(`Offline - Probing for ${timeLeft}s…`, 'var(--warning)');
+    } else {
+      clearInterval(probeTimer);
+      setProbeStatus('Reconnecting to Dashboard...', 'var(--warning)');
+    }
+  }, 1000);
+
+  try {
+    fetch(`/probe_start?bssid=${currentTarget.bssid}&channel=${currentTarget.channel}`).catch(e => console.log("Connection dropped"));
+  } catch (e) {}
 }
 async function stopProbe() {
-  await fetch('/probe_stop');
+  try { await fetch('/probe_stop'); } catch(e) {}
   clearInterval(pollInterval);
+  clearInterval(probeTimer);
   setProbeStatus('Probing Stopped', 'var(--text-muted)');
   setGlobalStatus('System Idle', 'pill-outline', 'circle-notch');
 }
@@ -537,15 +588,29 @@ async function startDeauth(mac) {
   updateDeauthAllBtn(); // Update broadcast button state
   
   const isBroadcast = (mac === 'FF:FF:FF:FF:FF:FF');
-  setProbeStatus(isBroadcast ? `Deauthing ALL clients…` : `Deauthing ${mac}…`, 'var(--danger)');
   setGlobalStatus('Deauth Active', 'pill-red pulse', 'bolt');
+  showPopup('Deauth Active', isBroadcast ? `Sending Broadcast 0xC0 frames  (Ch${currentTarget.channel})` : `Sending 0xC0 frames → ${mac}  (Ch${currentTarget.channel})`, 'bolt');
+  
+  let timeLeft = 30;
+  setProbeStatus(`Offline - Deauthing ${isBroadcast ? 'ALL' : mac} for ${timeLeft}s…`, 'var(--danger)');
+  clearInterval(probeTimer);
+  probeTimer = setInterval(() => {
+    timeLeft--;
+    if (timeLeft > 0) {
+      setProbeStatus(`Offline - Deauthing ${isBroadcast ? 'ALL' : mac} for ${timeLeft}s…`, 'var(--danger)');
+    } else {
+      clearInterval(probeTimer);
+      setProbeStatus('Reconnecting to Dashboard...', 'var(--warning)');
+    }
+  }, 1000);
   
   const url = `/deauth_start?bssid=${currentTarget.bssid}&channel=${currentTarget.channel}&client=${encodeURIComponent(mac)}&ssid=${encodeURIComponent(currentTarget.ssid || '')}`;
-  const res = await fetch(url);
-  if (res.ok) showPopup('Deauth Active', isBroadcast ? `Sending Broadcast 0xC0 frames  (Ch${currentTarget.channel})` : `Sending 0xC0 frames → ${mac}  (Ch${currentTarget.channel})`, 'bolt');
+  try {
+    fetch(url).catch(e => console.log("Connection dropped"));
+  } catch (e) {}
 }
 async function stopDeauth() {
-  await fetch('/deauth_stop');
+  try { await fetch('/deauth_stop'); } catch(e) {}
   currentDeauthMac = null;
   renderProbeClients(lastProbeData); // Reset button styles
   updateDeauthAllBtn(); // Reset broadcast button state
