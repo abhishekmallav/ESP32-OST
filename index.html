@@ -236,9 +236,7 @@
     .modal-actions { display: flex; flex-direction: column; gap: 12px; margin-top: 30px; }
     .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); padding: 12px 24px; border-radius: 999px; cursor: pointer; font-weight: 600; font-family: 'Outfit', sans-serif; transition: all 0.3s;}
     .btn-outline:hover { background: var(--bg); }
-    
-    esp-web-install-button { display: none; margin-top: 10px; }
-    esp-web-install-button.visible { display: block; }
+    esp-web-install-button { margin-top: 10px; }
     
     @media (max-width: 768px) {
       .nav-links { display: none; }
@@ -496,7 +494,7 @@
       
       const container = document.getElementById('installBtnContainer');
       container.innerHTML = `
-        <esp-web-install-button manifest="manifest.json">
+        <esp-web-install-button manifest="manifest.json" class="visible">
           <button slot="activation" class="btn-accent" style="font-size: 1.1rem; padding: 16px 36px;">
             <i class="fas fa-usb" style="margin-right: 8px;"></i> Select Port & Flash
           </button>
