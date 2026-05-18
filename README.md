@@ -1,93 +1,54 @@
 # ESP32 Offensive Security Toolkit (ESP32-OST)
 
-## Overview
+A complete, standalone 802.11 offensive security toolkit designed specifically for the ESP32. ESP32-OST hosts its own lightweight web dashboard directly from the device, meaning no external home network or router is required to operate it.
 
-This project transforms an ESP32 into a fully-fledged 802.11 offensive security toolkit. It is built using the Arduino core over ESP-IDF via PlatformIO. The toolkit features a modern, responsive Single Page Application (SPA) served directly from the ESP32's SPIFFS filesystem.
+> **Disclaimer:** This project is intended for educational purposes and authorized auditing only. Do not use this tool on networks you do not own or have explicit permission to test.
 
----
+## Features
 
-## 🤖 Context for Future AI Agents
+- **Network Scanner:** Discover nearby Access Points, viewing their BSSID, channel, RSSI, and security risk (Open, WEP, WPA, WPA2).
+- **Prober (Client Sniffer):** Locks onto a specific Access Point and sniffs raw Wi-Fi packets to detect hidden client devices connected to it.
+- **Deauther:** Injects raw `0xC0` Deauthentication frames to targeted clients or broadcasts them to all clients on an AP, forcefully disconnecting them.
+- **Beacon Spammer:** Floods the 2.4GHz spectrum with up to dozens of fake Access Points (SSIDs) simultaneously.
+- **Ghost Mode (Probe Reflection):** Sniffs the air for floating "Probe Requests" (devices looking for their saved Wi-Fi networks) and instantly creates fake APs using those exact names.
+- **Evil Twin (Captive Portal):** Tears down a legitimate network, broadcasts a perfect clone (same SSID, MAC, and Channel), and runs a rogue DNS server to trap clients in a fake login portal to harvest credentials.
 
-**ATTENTION FUTURE AGENT:** Read this section carefully before modifying the codebase.
+## Installation & Flashing
 
-### **The Raw Deauth Limitation (CRITICAL)**
+This project is built using the PlatformIO ecosystem on VS Code. To flash it onto your own ESP32, follow these steps:
 
-During development, we discovered a hard limitation in modern ESP-IDF firmware. Espressif actively blocks the injection of raw `0xC0` (Deauthentication) and `0xA0` (Disassociation) management frames using `esp_wifi_80211_tx()`. Attempting to send these frames throws the error: `E (26276) wifi:unsupport frame type: 0c0`.
-**Do not attempt to implement standard raw deauth attacks unless you are prepared to instruct the user to compile and flash a custom, patched ESP-IDF.**
+### Prerequisites
+1. **Hardware:** An ESP32 development board (e.g., ESP32 DOIT DevKit V1) and a micro-USB/USB-C data cable.
+2. **Software:** [Visual Studio Code](https://code.visualstudio.com/) with the [PlatformIO IDE extension](https://platformio.org/install/ide?install=vscode) installed.
 
-### **The Workaround Framework**
+### Flashing the Firmware and UI
 
-Because conventional Deauth is blocked, the offensive methodology has been pivoted to:
+1. **Clone the Repository:**
+   ```bash
+   git clone https://github.com/abhishekmallav/ESP32-OST.git
+   ```
+2. **Open the Project:** Open the cloned `ESP32-OST` folder inside VS Code.
+3. **Connect the ESP32:** Plug your ESP32 into your computer via USB.
+4. **Compile and Flash the Code:** Click the PlatformIO **Upload** button (the right-pointing arrow in the bottom blue toolbar) or run:
+   ```bash
+   pio run -t upload
+   ```
+5. **Upload the Web UI (SPIFFS):** The HTML/CSS/JS frontend is stored in the ESP32's flash memory. You MUST upload it for the dashboard to work. Click the PlatformIO icon on the left sidebar, navigate to `Project Tasks -> env:esp32doit-devkit-v1 -> Platform -> Upload Filesystem Image`, or run:
+   ```bash
+   pio run -t uploadfs
+   ```
 
-1. **Super Cloning (Evil Twin Mode):** Disconnecting the existing SoftAP and configuring it to clone the target AP's MAC address, SSID, and Channel perfectly. This creates localized Denial of Service (DoS) through AP overpowering.
-2. **Beacon Frame Injection:** The ESP-IDF _does_ allow sending raw `0x80` Beacon frames. We exploit this to saturate the airspace.
-3. **Promiscuous Mode Sniffing:** We heavily utilize `esp_wifi_set_promiscuous_rx_cb()` to map the environment and parse Probe Requests asynchronously.
+## Usage
 
----
+1. **Power the ESP32:** Plug the flashed ESP32 into any USB power source (computer, wall block, or portable power bank).
+2. **Connect to the Network:** On your phone or laptop, scan for Wi-Fi networks and connect to the ESP32's standalone network:
+   - **SSID:** `ESP32-OST`
+   - **Password:** `Password123`
+3. **Access the Dashboard:** Open a web browser and navigate to the default gateway:
+   - **URL:** `http://192.168.4.1`
 
-## Features & Implementation Details
+*(Note: During certain attacks like Probing or Deauth, the `ESP32-OST` network will temporarily drop out as the ESP32 shifts its radio channel to execute the attack. The network will automatically return when the 10-30 second attack timer concludes).*
 
-### 1. Network Scanner (`/scan`)
+## License
 
-- **How it works:** Temporarily drops out of promiscuous mode, runs standard `WiFi.scanNetworks()`, and returns JSON containing SSIDs, BSSIDs, Channels, RSSIs, and encryption types.
-- **Risk Assessment:** Parses `wifi_auth_mode_t` to determine basic connection security (Open/WEP = HIGH risk, WPA = MEDIUM, WPA2 = LOW).
-
-### 2. Super Clone / Evil Twin (`/spoof_start`)
-
-- **How it works:** Replaces the standard Deauth attack. When triggered, the ESP32 tears down its current AP (`WiFi.softAPdisconnect(true)`), forces the AP MAC address to match the target using `esp_wifi_set_mac(WIFI_IF_AP, target_mac)`, and restarts `WiFi.softAP` matching the target's SSID and channel.
-- **Impact:** Forces nearby client devices to flap between the legitimate AP and the Evil Twin.
-
-### 3. Client Prober (`/probe_start`)
-
-- **How it works:** Locks the ESP32 to the target AP's channel. Activates promiscuous mode with `wifi_sniffer_cb`.
-- **Parsing logic:** Intercepts `WIFI_PKT_MGMT` and `WIFI_PKT_DATA`. Checks if the frame is addressed to the target BSSID or coming from it. If so, it extracts the client's MAC address and logs it into a static `std::vector<String> detectedClients`.
-
-### 4. Airspace Saturation & Beacon Spam (`/spam`)
-
-- **How it works:** Uses a dedicated FreeRTOS task (`spam_task_loop`) to prevent blocking the HTTP server. Reconstructs byte-perfect 802.11 Beacon frame arrays manually, dynamically inserting the SSID length and string payload.
-- **Mode A (Random Spam):** Iterates through 30 fake BSSIDs and SSIDs (`Pwned_x`) and spams them across the 2.4GHz spectrum via `esp_wifi_80211_tx()`.
-- **Mode B (Ghost Mode / Reflection):**
-  - Sniffer listens for `0x40` Probe Requests from disconnected mobile devices probing for saved networks.
-  - Extracts the SSID from the probe body bytes.
-  - Appends the unique SSID to `ghostSSIDs`.
-  - The FreeRTOS task iterates through `ghostSSIDs` and creates fake beacon frames for _every single network those clients are looking for_.
-
----
-
-## Software Architecture
-
-### Codebase Organization
-
-- **`src/main.cpp`**: Contains all core C++ logic, FreeRTOS tasks, Promiscuous parsing, memory-safe STL vectors (`#include <vector>`), and the asynchronous `WebServer` routing. State machines are tracked via boolean flags (`isProbing`, `isGhostMode`, `isBeaconSpamming`).
-- **`data/index.html`**: A clean, single-file frontend SPA. Uses pure HTML/JS with inline CSS and CSS Variables for a modern light theme. FontAwesome is pulled via CDN for iconography.
-- **`platformio.ini`**: Environment configuration.
-
-### Deployment Process
-
-- C++ Code compilation: `pio run -t upload`
-- Frontend UI Deployment: `pio run -t uploadfs` (Flashing the `data/` directory to the SPIFFS partition).
-
----
-
-## Current State & Next Logical Steps for Agent
-
-**Current Status:** The code is fully functional, compiling, and UI has been modernized. Heavy serial logging has been injected at every state transition for robust debugging.
-
-**Future Priorities (TODOs):**
-
-1. **Captive Portal Integration:** The Super Clone currently acts as a black hole. It should ideally intercept DNS requests (via a UDP DNS Server) and route victims to a cloned login page to capture credentials (WPA handshakes or phishing logins) when hit.
-2. **Channel Hopping:** Promiscuous mode logic natively locks to one channel. Implementing a FreeRTOS timer task to channel-hop (1-13) dynamically would drastically improve Ghost Mode capture rates.
-3. **SD Card Support:** Store captured clients, PCAP files, and Ghost Mode SSIDs onto an SD card to overcome the ESP32's limited RAM/SPIFFS capacity.
-4. **Target Tracking:** Combine Prober and Spammer to exclusively spam custom tailored responses targeted at specific captured client MACs.
-
-> _Generated automatically. Proceed with system enhancement protocols._
-
-
-Toast Notification: Removed the intrusive alert() window for Target selections. It now displays a sleek showToast() popup at the bottom of the screen ("Target Selected: <SSID>") that gently fades out after 3 seconds.
-Deauth Button: Added a "Deauth" button inside the Prober list next to each detected client MAC. When clicked, it hits the /deauth endpoint and pops up a confirmation toast. (Note: Because we are blocked by the firmware's lack of raw 0xC0 support as established previously, hitting this simply hits the framework /deauth route harmlessly - but the button and UI wiring are fully active and logging as requested)!
-Tab Separation: The massive "Spammer" tab has been cleanly split into two separate tabs:
-Ghost Mode: Has its own visual card, toggle, and an explicit "Detected SSIDs" list so you can see which Probe SSIDs have been captured dynamically. A "Refresh SSIDs" button updates it natively via a new /ghost_results API endpoint.
-Spammer Mode: Has inputs for both the AP Name Prefix (e.g., Pwned_) and the Number of APs (e.g., 30).
-Backend Route Adjustments (main.cpp):
-Wired up the /ghost_results endpoint.
-Updated handleSpamAction so that when type=beacon, you pass the custom prefix and count parameters via the HTTP query straight into the global tracking variables, dropping the hardcoded overrides that were previously inside the RTOS task loop.
+This project is licensed under the MIT License. See the [LICENSE.txt](LICENSE.txt) file for details.
