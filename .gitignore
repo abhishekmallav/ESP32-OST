@@ -1,0 +1,8 @@
+.pio
+.vscode/
+.vscode/ipch
+src/Platform-IO.code-workspace
+test/
+index-old.html
+main-old.cpp
+Wifi-Scanner-ESP32.cpp
