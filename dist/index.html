@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ESP32-OST | Advanced Auditing</title>
+  
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><path fill='%23c4f03a' d='M443.3 22.7L420.6 0l-56.6 56.6 22.7 22.7-56.6 56.6-22.7-22.7-113.1 113.1c-38.6 38.6-38.6 101.4 0 140l56.6 56.6c38.6 38.6 101.4 38.6 140 0l113.1-113.1-22.7-22.7 56.6-56.6 22.7 22.7L500 226.3l-56.7-203.6zM226.3 339.4c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0 12.5 32.8 0 45.3-32.8 12.5-45.3 0z'/></svg>">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <style>
+    :root[data-theme="light"] {
+      --bg: #f4f5f6;
+      --surface: #ffffff;
+      --nav-bg: #0d0d0d;
+      --nav-text: #ffffff;
+      --accent: #c4f03a;
+      --accent-hover: #b0dc2e;
+      --accent-dark: #9ac227;
+      --text: #0d0d0d;
+      --text-muted: #666666;
+      --border: #e5e5e5;
+      --shadow-color: rgba(0,0,0,0.06);
+      --shadow-color-hover: rgba(0,0,0,0.12);
+      --danger: #ef4444;
+    }
+
+    :root[data-theme="dark"] {
+      --bg: #0a0a0a;
+      --surface: #141414;
+      --nav-bg: #ffffff;
+      --nav-text: #0a0a0a;
+      --accent: #c4f03a;
+      --accent-hover: #b0dc2e;
+      --accent-dark: #9ac227;
+      --text: #ffffff;
+      --text-muted: #a3a3a3;
+      --border: #2a2a2a;
+      --shadow-color: rgba(0,0,0,0.4);
+      --shadow-color-hover: rgba(196, 240, 58, 0.15);
+      --danger: #ef4444;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    body { 
+      font-family: 'Outfit', sans-serif; 
+      background: var(--bg);
+      color: var(--text); 
+      min-height: 100vh; 
+      overflow-x: hidden;
+      transition: background 0.4s ease, color 0.4s ease;
+    }
+
+    /* Floating Navbar */
+    .navbar {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 90%;
+      max-width: 1100px;
+      background: var(--nav-bg);
+      color: var(--nav-text);
+      border-radius: 999px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 10px 10px 24px;
+      z-index: 100;
+      box-shadow: 0 10px 30px var(--shadow-color);
+      transition: background 0.4s ease, color 0.4s ease;
+    }
+
+    .nav-logo { font-size: 1.4rem; font-weight: 800; display: flex; align-items: center; gap: 10px; letter-spacing: -0.5px;}
+    .nav-logo i { color: var(--accent); }
+    
+    .nav-links { display: flex; gap: 24px; align-items: center; }
+    .nav-links a { color: var(--nav-text); text-decoration: none; font-weight: 500; font-size: 0.95rem; transition: opacity 0.2s; opacity: 0.8;}
+    .nav-links a:hover { opacity: 1; }
+
+    .nav-actions { display: flex; align-items: center; gap: 10px; }
+    .theme-btn { background: transparent; border: none; color: var(--nav-text); font-size: 1.2rem; cursor: pointer; padding: 10px; transition: transform 0.3s; opacity: 0.8;}
+    .theme-btn:hover { transform: rotate(30deg); opacity: 1; }
+    
+    .btn-accent {
+      background: var(--accent);
+      color: #0d0d0d;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 999px;
+      font-weight: 700;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      font-family: 'Outfit', sans-serif;
+    }
+    .btn-accent:hover { background: var(--accent-hover); transform: translateY(-2px); box-shadow: 0 5px 15px rgba(196, 240, 58, 0.3); }
+
+    /* Hero Section */
+    .hero { text-align: center; padding: 160px 20px 60px; max-width: 800px; margin: 0 auto; }
+    .hero h1 { font-size: 4rem; font-weight: 800; line-height: 1.1; margin-bottom: 20px; letter-spacing: -1.5px;}
+    .hero h1 span { color: var(--accent); }
+    .hero p { font-size: 1.2rem; color: var(--text-muted); margin-bottom: 40px; }
+
+    /* Feature Cards */
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 30px;
+      padding: 40px 20px 80px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .feature-card {
+      background: var(--surface);
+      border-radius: 20px;
+      padding: 35px;
+      box-shadow: 0 10px 30px var(--shadow-color);
+      border: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      transition: all 0.3s ease;
+    }
+
+    .feature-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 15px 40px var(--shadow-color-hover);
+      border-color: var(--accent);
+    }
+
+    .feature-title { font-size: 1.5rem; font-weight: 700; margin-bottom: 15px; color: var(--text); }
+    .feature-desc { font-size: 1.05rem; color: var(--text-muted); line-height: 1.6; margin-bottom: 25px; }
+
+    .feature-tech {
+      font-size: 0.9rem; color: var(--text);
+      background: rgba(196, 240, 58, 0.08); padding: 16px; border-radius: 10px; border-left: 4px solid var(--accent);
+      line-height: 1.5; font-family: monospace;
+      margin-top: auto;
+    }
+    .feature-tech strong { color: var(--accent-dark); font-family: 'Outfit', sans-serif; display: block; margin-bottom: 6px;}
+
+    /* Custom CSS Animations */
+    .anim-container { height: 80px; width: 100%; display: flex; align-items: center; justify-content: flex-start; margin-bottom: 20px; font-size: 2.5rem; color: var(--text); position: relative;}
+    
+    /* 1. Radar Animation */
+    .radar-anim { position: relative; width: 60px; height: 60px; border: 2px solid var(--text); border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center;}
+    .radar-anim::before { content: ''; position: absolute; top: 50%; left: 50%; width: 50%; height: 50%; background: conic-gradient(from 0deg, transparent 70%, var(--accent) 100%); transform-origin: 0 0; animation: spin 2s linear infinite; }
+    .radar-anim::after { content: ''; position: absolute; width: 6px; height: 6px; background: var(--danger); border-radius: 50%; top: 25%; left: 35%; opacity: 0; animation: ping 2s infinite linear; }
+    @keyframes spin { 100% { transform: rotate(360deg); } }
+    @keyframes ping { 0%, 20% { opacity: 0; } 25% { opacity: 1; } 40%, 100% { opacity: 0; } }
+
+    /* 2. Prober Animation (Magnifying Glass) */
+    .prober-anim { position: relative; width: 60px; height: 60px; display: flex; align-items: center; justify-content: center;}
+    .prober-anim .fa-search { z-index: 2; animation: searchPan 3s infinite ease-in-out alternate; color: var(--accent); }
+    .prober-anim .packet { position: absolute; font-size: 0.7rem; color: var(--text-muted); animation: floatPacket 2s infinite linear; }
+    .prober-anim .p1 { bottom: -10px; left: 0px; animation-delay: 0s; }
+    .prober-anim .p2 { bottom: -10px; right: 0px; animation-delay: 1s; }
+    @keyframes searchPan { 0% { transform: translate(-10px, -5px) scale(1.1); } 100% { transform: translate(10px, 5px) scale(1.1); } }
+    @keyframes floatPacket { 0% { transform: translateY(0); opacity: 0; } 20%, 80% { opacity: 1; } 100% { transform: translateY(-40px); opacity: 0; } }
+
+    /* 3. Deauth Animation (Device crossed out) */
+    .deauth-anim { position: relative; display: flex; align-items: center; gap: 15px;}
+    .deauth-anim .device-container { position: relative; }
+    .deauth-anim .fa-mobile-alt { font-size: 2.2rem; color: var(--text); }
+    .deauth-anim .fa-ban { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: var(--danger); font-size: 2.6rem; opacity: 0; animation: banAppear 2.5s infinite; text-shadow: 0 0 5px var(--bg);}
+    .deauth-anim .fa-wifi { color: var(--text); font-size: 1.5rem;}
+    @keyframes banAppear { 0%, 30% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); } 35% { opacity: 1; transform: translate(-50%, -50%) scale(1.2); } 40%, 80% { opacity: 1; transform: translate(-50%, -50%) scale(1); } 90%, 100% { opacity: 0; } }
+
+    /* 4. Beacon Flooder Animation */
+    .flood-anim { position: relative; display: flex; align-items: center; justify-content: center; width: 60px; height: 60px;}
+    .flood-anim .fa-broadcast-tower { font-size: 2.2rem; z-index: 2;}
+    .flood-anim .fwifi { position: absolute; font-size: 0.9rem; color: var(--accent); opacity: 0; }
+    .flood-anim .fw1 { animation: explodeUp 1.8s infinite 0s; }
+    .flood-anim .fw2 { animation: explodeUpRight 1.8s infinite 0.6s; }
+    .flood-anim .fw3 { animation: explodeUpLeft 1.8s infinite 1.2s; }
+    @keyframes explodeUp { 0% { transform: translateY(0) scale(0.5); opacity: 0; } 20% { opacity: 1; } 100% { transform: translateY(-40px) scale(1.5); opacity: 0; } }
+    @keyframes explodeUpRight { 0% { transform: translate(0, 0) scale(0.5); opacity: 0; } 20% { opacity: 1; } 100% { transform: translate(30px, -30px) scale(1.5); opacity: 0; } }
+    @keyframes explodeUpLeft { 0% { transform: translate(0, 0) scale(0.5); opacity: 0; } 20% { opacity: 1; } 100% { transform: translate(-30px, -30px) scale(1.5); opacity: 0; } }
+
+    /* 5. Spoofing / Glowing Tower Animation */
+    .spoof-anim { position: relative; }
+    .spoof-anim .fa-broadcast-tower { font-size: 2.5rem; animation: towerGlow 2s infinite alternate ease-in-out; }
+    @keyframes towerGlow { 0% { color: var(--text); filter: drop-shadow(0 0 0px var(--accent)); } 100% { color: var(--accent); filter: drop-shadow(0 0 15px var(--accent)); } }
+
+    /* 6. Captive Portal (Phishing - Magnet pulling Credentials) */
+    .fish-anim { position: relative; display: flex; align-items: center; justify-content: space-between; width: 80px; height: 60px; }
+    .fish-anim .fa-magnet { font-size: 2rem; color: var(--danger); transform: rotate(90deg); animation: magnetShake 3s infinite; }
+    .fish-anim .fa-key { font-size: 1.5rem; color: var(--text); animation: keyPull 3s infinite; }
+    @keyframes magnetShake { 0%, 40% { transform: rotate(90deg) translateX(0); } 45%, 55% { transform: rotate(90deg) translateX(-5px); } 60%, 100% { transform: rotate(90deg) translateX(0); } }
+    @keyframes keyPull { 0%, 40% { transform: translateX(30px); opacity: 0; } 45%, 55% { transform: translateX(0); opacity: 1; color: var(--accent); } 60%, 100% { transform: translateX(-20px) scale(0.5); opacity: 0; } }
+
+    /* Usage Section */
+    .usage-section { max-width: 1000px; margin: 0 auto 100px; padding: 0 20px; }
+    .section-header { text-align: center; margin-bottom: 50px; }
+    .section-header h2 { font-size: 2.5rem; font-weight: 800; margin-bottom: 10px; }
+    .section-header p { color: var(--text-muted); font-size: 1.1rem; }
+
+    .usage-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 24px; }
+    .usage-step { background: var(--surface); padding: 30px; border-radius: 20px; border: 1px solid var(--border); position: relative; }
+    .step-num { position: absolute; top: 20px; right: 20px; font-size: 3rem; font-weight: 800; color: var(--border); opacity: 0.5; line-height: 1; }
+    .usage-step h3 { font-size: 1.2rem; margin-bottom: 12px; color: var(--text); position: relative; z-index: 2;}
+    .usage-step p { font-size: 0.95rem; color: var(--text-muted); line-height: 1.6; position: relative; z-index: 2;}
+    code { background: var(--bg); color: var(--accent-dark); padding: 2px 6px; border-radius: 4px; font-family: monospace; font-weight: 700;}
+
+    /* Flash Section */
+    .flash-section { background: var(--surface); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 80px 20px; text-align: center; margin-bottom: 60px;}
+    .flash-section h2 { font-size: 2.5rem; margin-bottom: 15px; font-weight: 800;}
+    .flash-section p { color: var(--text-muted); margin-bottom: 30px; font-size: 1.1rem;}
+
+    .pulse { animation: pulse 2s infinite; }
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(196, 240, 58, 0.4); }
+      70% { box-shadow: 0 0 0 15px rgba(196, 240, 58, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(196, 240, 58, 0); }
+    }
+
+    /* Disclaimer */
+    .disclaimer { max-width: 800px; margin: 0 auto 60px; padding: 20px; background: rgba(239, 68, 68, 0.05); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 16px; display: flex; gap: 16px; align-items: center; color: var(--text);}
+    .disclaimer i { font-size: 2rem; color: var(--danger); }
+    .disclaimer p { font-size: 0.95rem; line-height: 1.5; margin: 0;}
+    
+    footer { text-align: center; padding: 40px 20px; color: var(--text-muted); border-top: 1px solid var(--border); }
+    footer a { color: var(--text); font-size: 1.5rem; margin: 0 10px; transition: color 0.3s; text-decoration: none;}
+    footer a:hover { color: var(--accent); }
+
+    /* Modal */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: none; align-items: center; justify-content: center; z-index: 1000; opacity: 0; transition: opacity 0.3s; backdrop-filter: blur(5px);}
+    .modal-overlay.active { opacity: 1; }
+    .modal { background: var(--surface); padding: 40px; border-radius: 24px; max-width: 500px; width: 90%; border: 1px solid var(--border); transform: translateY(20px) scale(0.95); transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);}
+    .modal-overlay.active .modal { transform: translateY(0) scale(1); }
+    .modal h3 { color: var(--danger); font-size: 1.8rem; margin-bottom: 15px; display: flex; align-items: center; gap: 10px; }
+    .modal p { color: var(--text); margin-bottom: 20px; line-height: 1.6; font-size: 1.05rem; }
+    .modal-actions { display: flex; flex-direction: column; gap: 12px; margin-top: 30px; }
+    .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); padding: 12px 24px; border-radius: 999px; cursor: pointer; font-weight: 600; font-family: 'Outfit', sans-serif; transition: all 0.3s;}
+    .btn-outline:hover { background: var(--bg); }
+    
+    esp-web-install-button { display: none; margin-top: 10px; }
+    esp-web-install-button.visible { display: block; }
+    
+    @media (max-width: 768px) {
+      .nav-links { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Floating Navbar -->
+  <nav class="navbar">
+    <div class="nav-logo">
+      <i class="fas fa-satellite-dish"></i> ESP32-OST
+    </div>
+    <div class="nav-links">
+      <a href="#features">Architecture</a>
+      <a href="#usage">Deployment</a>
+      <a href="https://abhishekmallav.github.io/portfolio/" target="_blank">Portfolio</a>
+      <a href="https://github.com/abhishekmallav/ESP32-OST" target="_blank">GitHub</a>
+    </div>
+    <div class="nav-actions">
+      <button class="theme-btn" id="themeToggle"><i class="fas fa-moon"></i></button>
+      <button class="btn-accent" onclick="document.getElementById('install').scrollIntoView({behavior: 'smooth'})">Get Started</button>
+    </div>
+  </nav>
+
+  <!-- Hero Section -->
+  <section class="hero">
+    <h1>Advanced <span>802.11</span> Auditing.</h1>
+    <p>A completely standalone offensive security toolkit. Transform your ESP32 into a modernized penetration testing platform with an embedded Single Page Application dashboard.</p>
+  </section>
+
+  <!-- Feature Cards -->
+  <section id="features">
+    <div class="feature-grid">
+      
+      <!-- Feature 1: Scanner -->
+      <div class="feature-card">
+        <div class="anim-container">
+          <div class="radar-anim"></div>
+        </div>
+        <h3 class="feature-title">Airspace Scanner</h3>
+        <p class="feature-desc">Discover nearby access points, evaluate encryption strength, and map 2.4GHz topology.</p>
+        <div class="feature-tech">
+           <strong>Technical Execution:</strong>
+           Temporarily drops out of promiscuous mode to execute <code>WiFi.scanNetworks()</code>. Parses <code>wifi_auth_mode_t</code> to classify cryptographic risks.
+        </div>
+      </div>
+      
+      <!-- Feature 2: Prober -->
+      <div class="feature-card">
+        <div class="anim-container">
+          <div class="prober-anim">
+            <i class="fas fa-search"></i>
+            <i class="fas fa-file-alt packet p1"></i>
+            <i class="fas fa-file-alt packet p2"></i>
+          </div>
+        </div>
+        <h3 class="feature-title">Promiscuous Prober</h3>
+        <p class="feature-desc">Silently extract BSSIDs of hidden client devices connected to a target Access Point without authenticating.</p>
+        <div class="feature-tech">
+           <strong>Technical Execution:</strong>
+           Tunes radio to target channel. Hooks <code>esp_wifi_set_promiscuous_rx_cb()</code>. Intercepts and parses raw <code>WIFI_PKT_MGMT</code> frames.
+        </div>
+      </div>
+
+      <!-- Feature 3: Deauth -->
+      <div class="feature-card">
+        <div class="anim-container">
+          <div class="deauth-anim">
+            <div class="device-container">
+              <i class="fas fa-mobile-alt"></i>
+              <i class="fas fa-ban"></i>
+            </div>
+            <i class="fas fa-wifi"></i>
+          </div>
+        </div>
+        <h3 class="feature-title">Deauth Injector</h3>
+        <p class="feature-desc">Forcefully disconnect targeted devices or blanket an entire network with localized denial of service.</p>
+        <div class="feature-tech">
+           <strong>Technical Execution:</strong>
+           Overrides firmware sanity checks to construct and inject raw <code>0xC0</code> IEEE 802.11 Deauthentication management frames.
+        </div>
+      </div>
+
+      <!-- Feature 4: Beacon Flooder -->
+      <div class="feature-card">
+        <div class="anim-container">
+          <div class="flood-anim">
+            <i class="fas fa-broadcast-tower"></i>
+            <i class="fas fa-wifi fwifi fw1"></i>
+            <i class="fas fa-wifi fwifi fw2"></i>
+            <i class="fas fa-wifi fwifi fw3"></i>
+          </div>
+        </div>
+        <h3 class="feature-title">Beacon Flooder</h3>
+        <p class="feature-desc">Saturate the 2.4GHz spectrum with dozens of fake Access Points simultaneously.</p>
+        <div class="feature-tech">
+           <strong>Technical Execution:</strong>
+           Utilizes a dedicated FreeRTOS task to construct byte-perfect <code>0x80</code> Beacon frames. Modifies SSID payloads dynamically in memory.
+        </div>
+      </div>
+
+      <!-- Feature 5: Spoofing / Glowing Tower -->
+      <div class="feature-card">
+        <div class="anim-container">
+          <div class="spoof-anim">
+            <i class="fas fa-broadcast-tower"></i>
+            <i class="fas fa-ghost"></i>
+          </div>
+        </div>
+        <h3 class="feature-title">AP Spoofing (Ghost)</h3>
+        <p class="feature-desc">Listen for devices searching for saved Wi-Fi networks, and instantly reflect fake APs using those names.</p>
+        <div class="feature-tech">
+           <strong>Technical Execution:</strong>
+           Sniffs <code>0x40</code> Probe Requests. Extracts raw SSID byte payload and spawns responsive beacons to deceive the client OS.
+        </div>
+      </div>
+
+      <!-- Feature 6: Captive Portal -->
+      <div class="feature-card">
+        <div class="anim-container">
+          <div class="fish-anim">
+            <i class="fas fa-magnet"></i>
+            <i class="fas fa-key"></i>
+          </div>
+        </div>
+        <h3 class="feature-title">Captive Portal</h3>
+        <p class="feature-desc">Perfectly clone a target network and route victims to a credential-harvesting local web server.</p>
+        <div class="feature-tech">
+           <strong>Technical Execution:</strong>
+           Tears down legitimate SoftAP and clones target MAC via <code>esp_wifi_set_mac</code>. Initiates <code>DNSServer</code> to hijack UDP Port 53.
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Usage Protocol -->
+  <section id="usage" class="usage-section">
+    <div class="section-header">
+      <h2>Deployment Protocol</h2>
+      <p>Configure, flash, and connect to the auditing dashboard.</p>
+    </div>
+    
+    <div class="usage-grid">
+      <div class="usage-step">
+        <div class="step-num">01</div>
+        <h3>Configure Home AP</h3>
+        <p>Configure your 2.4GHz Wi-Fi router or mobile hotspot with the exact Network Name (SSID): <code>ESP32-OST</code> and Password: <code>Password123</code>.</p>
+      </div>
+      <div class="usage-step">
+        <div class="step-num">02</div>
+        <h3>Connect Hardware</h3>
+        <p>Plug your ESP32 board into your computer using a data-capable USB cable. Ensure browser serial permissions are allowed.</p>
+      </div>
+      <div class="usage-step">
+        <div class="step-num">03</div>
+        <h3>Flash Firmware</h3>
+        <p>Click the flash button below. Upon completion, the ESP32 will reboot and automatically connect to your <code>ESP32-OST</code> network.</p>
+      </div>
+      <div class="usage-step">
+        <div class="step-num">04</div>
+        <h3>Access Dashboard</h3>
+        <p>Find the local IP address assigned to the ESP32 by your router/hotspot and enter it into your web browser to initialize the dashboard. You can also see the IP of the ESP from the serial monitor at <code>115200</code> baudrate.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Web Serial Section -->
+  <section id="install" class="flash-section">
+    <h2>Hardware Initialization</h2>
+    <p>Flash the firmware directly from Chrome/Edge using Web Serial API.</p>
+    <button class="btn-accent pulse" style="font-size: 1.1rem; padding: 16px 36px;" onclick="openModal()">
+      <i class="fas fa-microchip" style="margin-right: 8px;"></i> Flash Firmware to ESP32
+    </button>
+  </section>
+
+  <!-- Disclaimer -->
+  <div class="disclaimer">
+    <i class="fas fa-shield-alt"></i>
+    <p><strong>Strictly Educational.</strong> This firmware is provided for authorized auditing and educational research only. You are solely responsible for your actions. The author is not responsible for any misuse, data loss, or illegal acts caused by the deployment of this software. Use responsibly on networks you own.</p>
+  </div>
+
+  <footer>
+    <div style="margin-bottom: 20px;">
+      <a href="https://github.com/abhishekmallav/ESP32-OST" target="_blank" title="GitHub"><i class="fab fa-github"></i></a>
+      <a href="https://www.linkedin.com/in/abhishekmallav/" target="_blank" title="LinkedIn"><i class="fab fa-linkedin"></i></a>
+      <a href="https://x.com/abhishekmallav" target="_blank" title="X (Twitter)"><i class="fab fa-twitter"></i></a>
+      <a href="https://www.instagram.com/abhishekmallav" target="_blank" title="Instagram"><i class="fab fa-instagram"></i></a>
+      <a href="https://abhishekmallav.github.io/portfolio/" target="_blank" title="Portfolio"><i class="fas fa-globe"></i></a>
+    </div>
+    <p>&copy; 2026 Abhishek Mallav. Curious by nature, Engineer by craft.</p>
+  </footer>
+
+  <!-- Warning Modal -->
+  <div class="modal-overlay" id="flashModal">
+    <div class="modal">
+      <h3><i class="fas fa-exclamation-triangle"></i> Data Loss Warning</h3>
+      <p><strong>This action will completely erase the flash memory on your ESP32.</strong></p>
+      <p>All existing data, sketches, or firmware currently on the board will be permanently deleted and replaced with the ESP32-OST toolkit and filesystem.</p>
+      <p style="font-size: 0.95rem; color: var(--text-muted);">Ensure you have selected the correct COM port when prompted by your browser.</p>
+      
+      <div class="modal-actions">
+        <!-- The actual Web Tools button -->
+        <esp-web-install-button manifest="manifest.json" class="visible"></esp-web-install-button>
+        <button class="btn-outline" onclick="closeModal()">Cancel Operation</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="https://unpkg.com/esp-web-tools@9.4.2/dist/web/install-button.js?module"></script>
+  <script>
+    // Theme Toggle Logic
+    const themeToggle = document.getElementById('themeToggle');
+    const html = document.documentElement;
+    const icon = themeToggle.querySelector('i');
+
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      html.setAttribute('data-theme', 'dark');
+      icon.className = 'fas fa-sun';
+    }
+
+    themeToggle.addEventListener('click', () => {
+      if (html.getAttribute('data-theme') === 'dark') {
+        html.setAttribute('data-theme', 'light');
+        icon.className = 'fas fa-moon';
+      } else {
+        html.setAttribute('data-theme', 'dark');
+        icon.className = 'fas fa-sun';
+      }
+    });
+
+    // Modal Logic
+    const modalOverlay = document.getElementById('flashModal');
+    function openModal() {
+      modalOverlay.style.display = 'flex';
+      setTimeout(() => modalOverlay.classList.add('active'), 10);
+    }
+    
+    function closeModal() {
+      modalOverlay.classList.remove('active');
+      setTimeout(() => modalOverlay.style.display = 'none', 300);
+    }
+
+    modalOverlay.addEventListener('click', (e) => {
+      if (e.target === modalOverlay) closeModal();
+    });
+
+    const installButton = document.querySelector('esp-web-install-button');
+    installButton.addEventListener('install-finished', () => {
+      closeModal();
+      alert("Installation Complete! Ensure your ESP32-OST AP is active, wait for reboot, and navigate to the assigned IP address.");
+    });
+  </script>
+</body>
+</html>
