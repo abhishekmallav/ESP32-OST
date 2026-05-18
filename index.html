@@ -41,6 +41,7 @@
       --shadow-color-hover: rgba(196, 240, 58, 0.15);
       --danger: #ef4444;
     }
+    [data-theme="dark"] .modal { border-color: rgba(255, 255, 255, 0.2); }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
     
@@ -227,10 +228,9 @@
     footer a:hover { color: var(--accent); }
 
     /* Modal */
-    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: none; align-items: center; justify-content: center; z-index: 1000; opacity: 0; transition: opacity 0.3s; backdrop-filter: blur(5px);}
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: none; align-items: center; justify-content: center; z-index: 1000; opacity: 0; transition: opacity 0.3s; }
     .modal-overlay.active { opacity: 1; }
-    .modal { background: var(--surface); padding: 40px; border-radius: 24px; max-width: 500px; width: 90%; border: 1px solid var(--border); transform: translateY(20px) scale(0.95); transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);}
-    .modal-overlay.active .modal { transform: translateY(0) scale(1); }
+    .modal { background: var(--surface); padding: 40px; border-radius: 24px; max-width: 500px; width: 90%; border: 1px solid var(--border); margin: auto; }
     .modal h3 { color: var(--danger); font-size: 1.8rem; margin-bottom: 15px; display: flex; align-items: center; gap: 10px; }
     .modal p { color: var(--text); margin-bottom: 20px; line-height: 1.6; font-size: 1.05rem; }
     .modal-actions { display: flex; flex-direction: column; gap: 12px; margin-top: 30px; }
