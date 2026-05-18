@@ -1,54 +1,116 @@
-# ESP32 Offensive Security Toolkit (ESP32-OST)
+<div align="center">
+  <img src="https://img.shields.io/badge/ESP32-Offensive%20Security-c4f03a?style=for-the-badge&logo=espressif&logoColor=black" alt="ESP32-OST" />
+  <h1>ESP32 Offensive Security Toolkit (ESP32-OST)</h1>
+  <p><strong>Advanced 802.11 Auditing & Penetration Testing Framework</strong></p>
+</div>
 
-A complete, standalone 802.11 offensive security toolkit designed specifically for the ESP32. ESP32-OST hosts its own lightweight web dashboard directly from the device, meaning no external home network or router is required to operate it.
+<br>
 
-> **Disclaimer:** This project is intended for educational purposes and authorized auditing only. Do not use this tool on networks you do not own or have explicit permission to test.
+> ⚠️ **STRICTLY EDUCATIONAL DISCLAIMER**
+> 
+> This firmware is provided for authorized auditing, educational research, and security evaluation purposes only. **You are solely responsible for your actions.** The author (Abhishek Mallav) is not responsible for any misuse, data loss, network damage, or illegal acts caused by the deployment of this software. By downloading or flashing this firmware, you agree to use it responsibly and exclusively on networks you own or have explicit permission to test.
 
-## Features
+---
 
-- **Network Scanner:** Discover nearby Access Points, viewing their BSSID, channel, RSSI, and security risk (Open, WEP, WPA, WPA2).
-- **Prober (Client Sniffer):** Locks onto a specific Access Point and sniffs raw Wi-Fi packets to detect hidden client devices connected to it.
-- **Deauther:** Injects raw `0xC0` Deauthentication frames to targeted clients or broadcasts them to all clients on an AP, forcefully disconnecting them.
-- **Beacon Spammer:** Floods the 2.4GHz spectrum with up to dozens of fake Access Points (SSIDs) simultaneously.
-- **Ghost Mode (Probe Reflection):** Sniffs the air for floating "Probe Requests" (devices looking for their saved Wi-Fi networks) and instantly creates fake APs using those exact names.
-- **Evil Twin (Captive Portal):** Tears down a legitimate network, broadcasts a perfect clone (same SSID, MAC, and Channel), and runs a rogue DNS server to trap clients in a fake login portal to harvest credentials.
+## 📖 Overview
 
-## Installation & Flashing
+Transform your standard ESP32 microcontroller into a modernized, standalone penetration testing platform. ESP32-OST is a high-performance toolkit that bypasses standard firmware sanity checks to perform raw IEEE 802.11 frame injection, complete with a beautifully designed, embedded Single Page Application (SPA) dashboard.
 
-This project is built using the PlatformIO ecosystem on VS Code. To flash it onto your own ESP32, follow these steps:
+---
 
-### Prerequisites
-1. **Hardware:** An ESP32 development board (e.g., ESP32 DOIT DevKit V1) and a micro-USB/USB-C data cable.
-2. **Software:** [Visual Studio Code](https://code.visualstudio.com/) with the [PlatformIO IDE extension](https://platformio.org/install/ide?install=vscode) installed.
+## ⚡ Technical Attack Vectors
 
-### Flashing the Firmware and UI
+ESP32-OST demonstrates several advanced wireless attack vectors using low-level radio manipulation:
 
-1. **Clone the Repository:**
-   ```bash
-   git clone https://github.com/abhishekmallav/ESP32-OST.git
-   ```
-2. **Open the Project:** Open the cloned `ESP32-OST` folder inside VS Code.
-3. **Connect the ESP32:** Plug your ESP32 into your computer via USB.
-4. **Compile and Flash the Code:** Click the PlatformIO **Upload** button (the right-pointing arrow in the bottom blue toolbar) or run:
-   ```bash
-   pio run -t upload
-   ```
-5. **Upload the Web UI (SPIFFS):** The HTML/CSS/JS frontend is stored in the ESP32's flash memory. You MUST upload it for the dashboard to work. Click the PlatformIO icon on the left sidebar, navigate to `Project Tasks -> env:esp32doit-devkit-v1 -> Platform -> Upload Filesystem Image`, or run:
-   ```bash
-   pio run -t uploadfs
-   ```
+### 1. Airspace Scanner
+Discover nearby access points, evaluate encryption strength, and map 2.4GHz topology.
+* **Technical Details:** Temporarily drops out of promiscuous mode to execute `WiFi.scanNetworks()`. Parses `wifi_auth_mode_t` to classify cryptographic risks.
 
-## Usage
+### 2. Promiscuous Prober
+Silently extract BSSIDs of hidden client devices connected to a target Access Point without authenticating.
+* **Technical Details:** Tunes the radio to a target channel and hooks `esp_wifi_set_promiscuous_rx_cb()`. Intercepts and parses raw `WIFI_PKT_MGMT` frames in real-time.
 
-1. **Power the ESP32:** Plug the flashed ESP32 into any USB power source (computer, wall block, or portable power bank).
-2. **Connect to the Network:** On your phone or laptop, scan for Wi-Fi networks and connect to the ESP32's standalone network:
-   - **SSID:** `ESP32-OST`
-   - **Password:** `Password123`
-3. **Access the Dashboard:** Open a web browser and navigate to the default gateway:
-   - **URL:** `http://192.168.4.1`
+### 3. Deauth Injector
+Forcefully disconnect targeted devices or blanket an entire network with localized denial of service.
+* **Technical Details:** Overrides Espressif firmware sanity checks (`ieee80211_raw_frame_sanity_check`) to construct and rapidly inject raw `0xC0` IEEE 802.11 Deauthentication management frames.
 
-*(Note: During certain attacks like Probing or Deauth, the `ESP32-OST` network will temporarily drop out as the ESP32 shifts its radio channel to execute the attack. The network will automatically return when the 10-30 second attack timer concludes).*
+### 4. Beacon Flooder
+Saturate the 2.4GHz spectrum with dozens of fake Access Points simultaneously.
+* **Technical Details:** Utilizes a dedicated FreeRTOS background task to construct byte-perfect `0x80` Beacon frames, dynamically modifying SSID payloads in memory to broadcast massive spoofed networks.
 
-## License
+### 5. AP Spoofing (Ghost Mode)
+Listen for devices searching for saved Wi-Fi networks, and instantly reflect fake APs using those exact names.
+* **Technical Details:** Sniffs `0x40` Probe Requests. Extracts the raw SSID byte payload from the probe and spawns responsive beacons to deceive the client OS into connecting.
 
-This project is licensed under the MIT License. See the [LICENSE.txt](LICENSE.txt) file for details.
+### 6. Captive Portal (Evil Twin)
+Perfectly clone a target network and route victims to a credential-harvesting local web server.
+* **Technical Details:** Tears down the legitimate SoftAP, clones the target MAC address via `esp_wifi_set_mac`, and initiates a `DNSServer` to hijack UDP Port 53, redirecting all DNS queries to a phishing landing page.
+
+---
+
+## 🛠️ Prerequisites
+
+Because this toolkit heavily utilizes the ESP32's single 2.4GHz radio for sniffing and injection, it requires an external access point to host the dashboard connection. 
+
+Before powering on the flashed ESP32, you **must** configure your Home Router or Mobile Hotspot with the following credentials on the **2.4GHz band**:
+
+* **Network Name (SSID):** `ESP32-OST`
+* **Password:** `Password123`
+
+*(The ESP32 will automatically connect to this network on boot, allowing you to access the dashboard by navigating to the ESP32's assigned local IP address).*
+
+---
+
+## 🚀 Installation & Setup
+
+You can install ESP32-OST using one of three methods, ranging from a 1-click web installer to full source-code compilation.
+
+### Method 1: Web Serial Installer (Recommended / Easiest)
+You can flash your ESP32 directly from your browser (Chrome or Edge required) without downloading any tools!
+1. Connect your ESP32 to your PC via a data-capable USB cable.
+2. Visit the Web Installer: **[https://abhishekmallav.github.io/ESP32-OST](https://abhishekmallav.github.io/ESP32-OST)**
+3. Click **"Flash Firmware to ESP32"**, select your COM port, and wait for the flash to complete.
+
+### Method 2: Manual Binaries Flash (esptool)
+If you prefer the command line, you can flash the pre-compiled binaries from the Releases tab.
+1. Download the latest `.bin` files (`bootloader.bin`, `partitions.bin`, `firmware.bin`, `spiffs.bin`) from the `/dist` folder.
+2. Install [esptool.py](https://github.com/espressif/esptool).
+3. Flash the partitions to their exact offsets:
+```bash
+esptool.py --chip esp32 --port COM_PORT --baud 115200 write_flash -z 0x1000 bootloader.bin 0x8000 partitions.bin 0x10000 firmware.bin 0x290000 spiffs.bin
+```
+
+### Method 3: PlatformIO Compilation (For Developers)
+For complete control and customization, build the firmware from source using VS Code.
+1. Install [Visual Studio Code](https://code.visualstudio.com/) and the [PlatformIO Extension](https://platformio.org/install/ide?install=vscode).
+2. Clone this repository: 
+```bash
+git clone https://github.com/abhishekmallav/ESP32-OST.git
+```
+3. Open the folder in VS Code.
+4. Run `PlatformIO: Build` to compile the C++ firmware.
+5. Run `PlatformIO: Build Filesystem Image` to pack the HTML/CSS from the `/data` folder into SPIFFS.
+6. Run `PlatformIO: Upload` and `PlatformIO: Upload Filesystem Image` to flash your ESP32.
+
+---
+
+## 🤝 Contribution & Feature Requests
+
+Contributions, bug reports, and feature requests are highly welcome! 
+* Have an idea for a new 802.11 attack vector?
+* Want to improve the UI/UX?
+* Found a bug in the state machine?
+
+Feel free to open an [Issue](https://github.com/abhishekmallav/ESP32-OST/issues) or submit a Pull Request! Please ensure your code follows the existing architecture (non-blocking FreeRTOS tasks) and includes proper documentation.
+
+---
+
+## 🔗 Connect With Me
+
+Built with ❤️ by **Abhishek Mallav** — *Curious by nature, Engineer by craft.*
+
+* 🌐 **Portfolio:** [abhishekmallav.github.io/portfolio](https://abhishekmallav.github.io/portfolio/)
+* 💼 **LinkedIn:** [linkedin.com/in/abhishekmallav](https://www.linkedin.com/in/abhishekmallav/)
+* 🕮 **GitHub:** [github.com/abhishekmallav](https://github.com/abhishekmallav)
+* 🐦 **X (Twitter):** [x.com/abhishekmallav](https://x.com/abhishekmallav)
+* 📸 **Instagram:** [@abhishekmallav](https://www.instagram.com/abhishekmallav)
